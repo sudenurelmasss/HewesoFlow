@@ -1,0 +1,6 @@
+@HewesoFlow.Api_HostAddress = http://localhost:5063
+
+GET {{HewesoFlow.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
