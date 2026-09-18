@@ -16,6 +16,32 @@ export interface ProjectMember {
   isActive: boolean;
 }
 
+export interface AvailableProjectUser {
+  id: string;
+
+  firstName: string;
+  lastName: string;
+  email: string;
+
+  department?: string | null;
+
+  isActive: boolean;
+
+  roles: string[];
+}
+
+export interface AddProjectMemberRequest {
+  projectId: string;
+  userId: string;
+
+  /*
+   * 0 = Member
+   * 1 = Contributor
+   * 2 = Viewer
+   */
+  role: number;
+}
+
 interface ApiResponse<T> {
   isSuccess?: boolean;
   message?: string;
@@ -26,8 +52,11 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:5063";
 
-function getHeaders() {
-  const token = getStoredToken();
+function getHeaders(
+  json = false
+): HeadersInit {
+  const token =
+    getStoredToken();
 
   if (!token) {
     throw new Error(
@@ -37,8 +66,16 @@ function getHeaders() {
 
   return {
     Accept: "application/json",
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
+
+    ...(json
+      ? {
+          "Content-Type":
+            "application/json",
+        }
+      : {}),
+
+    Authorization:
+      `Bearer ${token}`,
   };
 }
 
@@ -46,7 +83,8 @@ async function getErrorMessage(
   response: Response
 ): Promise<string> {
   try {
-    const result = await response.json();
+    const result =
+      await response.json();
 
     return (
       result?.message ||
@@ -58,7 +96,7 @@ async function getErrorMessage(
   }
 }
 
-function unwrapList(
+function unwrapMemberList(
   result:
     | ProjectMember[]
     | ApiResponse<ProjectMember[]>
@@ -67,7 +105,31 @@ function unwrapList(
     return result;
   }
 
-  if (Array.isArray(result.data)) {
+  if (
+    Array.isArray(
+      result.data
+    )
+  ) {
+    return result.data;
+  }
+
+  return [];
+}
+
+function unwrapUserList(
+  result:
+    | AvailableProjectUser[]
+    | ApiResponse<AvailableProjectUser[]>
+): AvailableProjectUser[] {
+  if (Array.isArray(result)) {
+    return result;
+  }
+
+  if (
+    Array.isArray(
+      result.data
+    )
+  ) {
     return result.data;
   }
 
@@ -81,24 +143,30 @@ export async function getProjectMembers(
     return [];
   }
 
-  const response = await fetch(
-    `${API_URL}/api/ProjectMembers/project/${encodeURIComponent(
-      projectId
-    )}`,
-    {
-      method: "GET",
-      headers: getHeaders(),
-      cache: "no-store",
-    }
-  );
+  const response =
+    await fetch(
+      `${API_URL}/api/ProjectMembers/project/${encodeURIComponent(
+        projectId
+      )}`,
+      {
+        method: "GET",
+        headers:
+          getHeaders(),
+        cache: "no-store",
+      }
+    );
 
-  if (response.status === 401) {
+  if (
+    response.status === 401
+  ) {
     throw new Error(
       "Oturum süresi dolmuş olabilir."
     );
   }
 
-  if (response.status === 403) {
+  if (
+    response.status === 403
+  ) {
     throw new Error(
       "Proje üyelerini görüntüleme yetkiniz bulunmuyor."
     );
@@ -106,7 +174,9 @@ export async function getProjectMembers(
 
   if (!response.ok) {
     throw new Error(
-      await getErrorMessage(response)
+      await getErrorMessage(
+        response
+      )
     );
   }
 
@@ -115,27 +185,150 @@ export async function getProjectMembers(
     | ApiResponse<ProjectMember[]> =
     await response.json();
 
-  return unwrapList(result);
+  return unwrapMemberList(
+    result
+  );
+}
+
+export async function getAvailableProjectUsers(): Promise<
+  AvailableProjectUser[]
+> {
+  const response =
+    await fetch(
+      `${API_URL}/api/Users`,
+      {
+        method: "GET",
+        headers:
+          getHeaders(),
+        cache: "no-store",
+      }
+    );
+
+  if (
+    response.status === 401
+  ) {
+    throw new Error(
+      "Oturum süresi dolmuş olabilir."
+    );
+  }
+
+  if (
+    response.status === 403
+  ) {
+    throw new Error(
+      "Kullanıcı listesini görüntüleme yetkiniz bulunmuyor."
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response
+      )
+    );
+  }
+
+  const result:
+    | AvailableProjectUser[]
+    | ApiResponse<AvailableProjectUser[]> =
+    await response.json();
+
+  return unwrapUserList(
+    result
+  ).filter(
+    (user) =>
+      user.isActive === true
+  );
+}
+
+export async function addProjectMember(
+  request: AddProjectMemberRequest
+): Promise<ProjectMember> {
+  if (
+    !request.projectId
+  ) {
+    throw new Error(
+      "Proje bilgisi bulunamadı."
+    );
+  }
+
+  if (!request.userId) {
+    throw new Error(
+      "Projeye eklenecek kullanıcıyı seçin."
+    );
+  }
+
+  const response =
+    await fetch(
+      `${API_URL}/api/ProjectMembers`,
+      {
+        method: "POST",
+
+        headers:
+          getHeaders(true),
+
+        body:
+          JSON.stringify({
+            projectId:
+              request.projectId,
+
+            userId:
+              request.userId,
+
+            role:
+              request.role,
+          }),
+      }
+    );
+
+  if (
+    response.status === 401
+  ) {
+    throw new Error(
+      "Oturum süresi dolmuş olabilir."
+    );
+  }
+
+  if (
+    response.status === 403
+  ) {
+    throw new Error(
+      "Bu projeye kullanıcı ekleme yetkiniz bulunmuyor."
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response
+      )
+    );
+  }
+
+  return await response.json();
 }
 
 export function getProjectMemberRole(
   role: string | number
 ): string {
-  if (typeof role === "string") {
+  if (
+    typeof role ===
+    "string"
+  ) {
     return role;
   }
 
   switch (role) {
     case 0:
-      return "Member";
+      return "Üye";
 
     case 1:
-      return "Contributor";
+      return "Katılımcı";
 
     case 2:
-      return "Viewer";
+      return "Görüntüleyici";
 
     default:
-      return "Member";
+      return "Üye";
   }
 }

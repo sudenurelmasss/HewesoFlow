@@ -10,5 +10,5 @@ public class RegisterRequestDto
 
     public string Password { get; set; } = string.Empty;
 
-    public string? Department { get; set; }
+    public Guid? DepartmentId { get; set; }
 }

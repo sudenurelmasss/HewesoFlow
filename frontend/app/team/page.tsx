@@ -1,6 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  Search,
+  ShieldCheck,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 
 import {
   ForbiddenError,
@@ -8,34 +19,72 @@ import {
   TeamMember,
 } from "@/services/teamService";
 
-function getDisplayName(member: TeamMember) {
-  if (member.fullName) {
-    return member.fullName;
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
+function getDisplayName(
+  member: TeamMember
+) {
+  if (
+    member.fullName?.trim()
+  ) {
+    return member.fullName.trim();
   }
 
-  const fullName = `${member.firstName ?? ""} ${
-    member.lastName ?? ""
-  }`.trim();
+  const fullName =
+    `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim();
 
   if (fullName) {
     return fullName;
   }
 
-  return member.email || "İsimsiz Kullanıcı";
+  return (
+    member.email ||
+    "İsimsiz Kullanıcı"
+  );
 }
 
-function getInitial(member: TeamMember) {
-  return getDisplayName(member).charAt(0).toUpperCase();
-}
+/* =========================================================
+   PAGE
+   ========================================================= */
 
 export default function TeamPage() {
-  const [members, setMembers] = useState<TeamMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [
+    members,
+    setMembers,
+  ] =
+    useState<TeamMember[]>(
+      []
+    );
 
-  const [error, setError] = useState("");
-  const [forbidden, setForbidden] = useState(false);
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
 
-  const [search, setSearch] = useState("");
+  const [
+    error,
+    setError,
+  ] =
+    useState("");
+
+  const [
+    forbidden,
+    setForbidden,
+  ] =
+    useState(false);
+
+  const [
+    search,
+    setSearch,
+  ] =
+    useState("");
+
+  /* =======================================================
+     LOAD
+     ======================================================= */
 
   async function loadMembers() {
     try {
@@ -43,284 +92,1019 @@ export default function TeamPage() {
       setError("");
       setForbidden(false);
 
-      const result = await getTeamMembers();
+      const result =
+        await getTeamMembers();
 
-      setMembers(result);
+      setMembers(
+        result
+      );
     } catch (error) {
-      if (error instanceof ForbiddenError) {
+      if (
+        error instanceof
+        ForbiddenError
+      ) {
         setForbidden(true);
         return;
       }
 
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Ekip bilgileri yüklenemedi.");
-      }
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Ekip bilgileri yüklenemedi."
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadMembers();
-  }, []);
+  useEffect(
+    () => {
+      loadMembers();
 
-  const filteredMembers = useMemo(() => {
-    const value = search.toLowerCase().trim();
+      function handleFocus() {
+        loadMembers();
+      }
 
-    if (!value) {
-      return members;
-    }
+      window.addEventListener(
+        "focus",
+        handleFocus
+      );
 
-    return members.filter((member) => {
-      const text = `
-        ${getDisplayName(member)}
-        ${member.email ?? ""}
-        ${member.role ?? ""}
-        ${member.department ?? ""}
-        ${member.projectName ?? ""}
-      `.toLowerCase();
+      return () => {
+        window.removeEventListener(
+          "focus",
+          handleFocus
+        );
+      };
+    },
+    []
+  );
 
-      return text.includes(value);
-    });
-  }, [members, search]);
+  /* =======================================================
+     SEARCH
+     ======================================================= */
 
-  const activeMembers = members.filter(
-    (member) => member.isActive !== false
-  ).length;
+  const filteredMembers =
+    useMemo(
+      () => {
+        const value =
+          search
+            .trim()
+            .toLocaleLowerCase(
+              "tr-TR"
+            );
+
+        if (!value) {
+          return members;
+        }
+
+        return members.filter(
+          member => {
+            const searchable =
+              [
+                getDisplayName(
+                  member
+                ),
+
+                member.email ??
+                  "",
+
+                member.role ??
+                  "Team Member",
+
+                member.department ??
+                  "",
+              ]
+                .join(" ")
+                .toLocaleLowerCase(
+                  "tr-TR"
+                );
+
+            return searchable.includes(
+              value
+            );
+          }
+        );
+      },
+      [
+        members,
+        search,
+      ]
+    );
+
+  /* =======================================================
+     COUNTS
+     ======================================================= */
+
+  const activeMembers =
+    members.filter(
+      member =>
+        member.isActive !==
+        false
+    ).length;
+
+  const passiveMembers =
+    members.length -
+    activeMembers;
+
+  /* =========================================================
+     VIEW
+     ========================================================= */
 
   return (
-    <main className="min-h-screen bg-[#f6f7fb] px-6 py-8 text-[#17181c]">
-      <div className="mx-auto max-w-7xl">
+    <main
+      className="
+        min-h-screen
+        px-6
+        py-8
+        pb-24
+        text-gray-950
 
-        <div className="mb-8">
-          <p className="mb-2 text-sm font-medium text-gray-500">
-            HewesoFlow
+        dark:text-white
+      "
+    >
+      <div
+        className="
+          mx-auto
+          max-w-[1280px]
+        "
+      >
+        {/* ===================================================
+            HEADER
+            =================================================== */}
+
+        <div
+          className="
+            mb-7
+          "
+        >
+          <p
+            className="
+              text-[9px]
+              font-bold
+              uppercase
+              tracking-[0.22em]
+              text-gray-400
+
+              dark:text-slate-500
+            "
+          >
+            Organizasyon Yönetimi
           </p>
 
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1
+            className="
+              mt-2
+              text-[30px]
+              font-bold
+              tracking-[-0.04em]
+              text-gray-950
+
+              dark:text-white
+            "
+          >
             Ekip
           </h1>
 
-          <p className="mt-2 text-sm text-gray-500">
-            Kullanıcıları ve proje ekiplerini görüntüleyin.
+          <p
+            className="
+              mt-2
+              text-[11px]
+              font-medium
+              text-gray-500
+
+              dark:text-slate-400
+            "
+          >
+            Kullanıcıları,
+            rollerini ve departman
+            dağılımlarını görüntüleyin.
           </p>
         </div>
 
+        {/* ===================================================
+            LOADING
+            =================================================== */}
+
         {loading && (
-          <div className="rounded-3xl border border-gray-200 bg-white p-16 text-center">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-black" />
+          <div
+            className="
+              rounded-[24px]
+              border
+              border-white/80
+              bg-white/90
+              p-16
+              text-center
+              shadow-sm
+              backdrop-blur-xl
 
-            <p className="text-sm text-gray-500">
-              Ekip bilgileri yükleniyor...
-            </p>
-          </div>
-        )}
+              dark:border-slate-800
+              dark:bg-[#081321]
+            "
+          >
+            <div
+              className="
+                mx-auto
+                mb-4
+                h-8
+                w-8
+                animate-spin
+                rounded-full
+                border-2
+                border-gray-200
+                border-t-blue-500
+              "
+            />
 
-        {!loading && forbidden && (
-          <div className="rounded-[32px] border border-gray-200 bg-white p-14 text-center">
+            <p
+              className="
+                text-[11px]
+                font-medium
+                text-gray-500
 
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 text-2xl">
-              🔒
-            </div>
-
-            <h2 className="mt-6 text-xl font-semibold">
-              Bu alan için yetkiniz bulunmuyor
-            </h2>
-
-            <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-gray-500">
-              Ekip ve kullanıcı yönetimi yalnızca yetkili
-              kullanıcılar tarafından görüntülenebilir.
-              TeamMember hesabınızla kendi projelerinizi ve
-              görevlerinizi kullanmaya devam edebilirsiniz.
-            </p>
-
-            <div className="mt-7 flex justify-center gap-3">
-
-              <a
-                href="/projects"
-                className="rounded-2xl border border-gray-200 px-5 py-3 text-sm font-medium"
-              >
-                Projelere Git
-              </a>
-
-              <a
-                href="/my-tasks"
-                className="rounded-2xl bg-black px-5 py-3 text-sm font-medium text-white"
-              >
-                Görevlerime Git
-              </a>
-
-            </div>
-          </div>
-        )}
-
-        {!loading && !forbidden && error && (
-          <div className="rounded-3xl border border-red-200 bg-white p-8">
-
-            <p className="font-medium text-red-600">
-              Ekip yüklenemedi
-            </p>
-
-            <p className="mt-2 text-sm text-gray-500">
-              {error}
-            </p>
-
-            <button
-              onClick={loadMembers}
-              className="mt-5 rounded-xl bg-black px-5 py-2.5 text-sm text-white"
+                dark:text-slate-400
+              "
             >
-              Tekrar Dene
-            </button>
-
+              Ekip bilgileri
+              yükleniyor...
+            </p>
           </div>
         )}
+
+        {/* ===================================================
+            FORBIDDEN
+            =================================================== */}
+
+        {!loading &&
+          forbidden && (
+            <div
+              className="
+                rounded-[24px]
+                border
+                border-white/80
+                bg-white/90
+                p-14
+                text-center
+                shadow-sm
+                backdrop-blur-xl
+
+                dark:border-slate-800
+                dark:bg-[#081321]
+              "
+            >
+              <div
+                className="
+                  mx-auto
+                  flex
+                  h-14
+                  w-14
+                  items-center
+                  justify-center
+                  rounded-2xl
+                  bg-gray-100
+                  text-gray-500
+
+                  dark:bg-slate-800
+                  dark:text-slate-300
+                "
+              >
+                <ShieldCheck
+                  size={24}
+                />
+              </div>
+
+              <h2
+                className="
+                  mt-5
+                  text-[18px]
+                  font-bold
+                "
+              >
+                Bu alan için
+                yetkiniz bulunmuyor
+              </h2>
+
+              <p
+                className="
+                  mx-auto
+                  mt-2
+                  max-w-lg
+                  text-[11px]
+                  leading-5
+                  text-gray-500
+
+                  dark:text-slate-400
+                "
+              >
+                Ekip bilgileri
+                yalnızca yetkili
+                kullanıcılar tarafından
+                görüntülenebilir.
+              </p>
+            </div>
+          )}
+
+        {/* ===================================================
+            ERROR
+            =================================================== */}
+
+        {!loading &&
+          !forbidden &&
+          error && (
+            <div
+              className="
+                rounded-[22px]
+                border
+                border-red-200
+                bg-red-50
+                p-6
+
+                dark:border-red-500/30
+                dark:bg-red-500/10
+              "
+            >
+              <p
+                className="
+                  text-[13px]
+                  font-semibold
+                  text-red-600
+                "
+              >
+                Ekip yüklenemedi
+              </p>
+
+              <p
+                className="
+                  mt-1
+                  text-[11px]
+                  text-red-500/80
+                "
+              >
+                {error}
+              </p>
+
+              <button
+                type="button"
+                onClick={
+                  loadMembers
+                }
+                className="
+                  mt-4
+                  rounded-xl
+                  bg-black
+                  px-4
+                  py-2.5
+                  text-[11px]
+                  font-semibold
+                  text-white
+                "
+              >
+                Tekrar dene
+              </button>
+            </div>
+          )}
+
+        {/* ===================================================
+            CONTENT
+            =================================================== */}
 
         {!loading &&
           !forbidden &&
           !error && (
             <>
-              <div className="mb-6 grid gap-4 md:grid-cols-3">
+              {/* =================================================
+                  STAT CARDS
+                  ================================================= */}
 
-                <div className="rounded-3xl border border-gray-200 bg-white p-6">
-                  <p className="text-xs uppercase tracking-wider text-gray-400">
-                    Toplam Üye
-                  </p>
+              <div
+                className="
+                  mb-5
+                  grid
+                  gap-4
 
-                  <p className="mt-3 text-3xl font-semibold">
-                    {members.length}
-                  </p>
-                </div>
+                  md:grid-cols-3
+                "
+              >
+                {/* TOTAL */}
 
-                <div className="rounded-3xl border border-gray-200 bg-white p-6">
-                  <p className="text-xs uppercase tracking-wider text-gray-400">
-                    Aktif
-                  </p>
+                <div
+                  className="
+                    flex
+                    min-h-[88px]
+                    items-center
+                    gap-4
+                    rounded-[18px]
+                    border
+                    border-white/80
+                    bg-white/90
+                    px-5
+                    py-4
+                    shadow-[0_6px_22px_rgba(15,23,42,0.04)]
+                    backdrop-blur-xl
 
-                  <p className="mt-3 text-3xl font-semibold">
-                    {activeMembers}
-                  </p>
-                </div>
+                    dark:border-slate-800
+                    dark:bg-[#081321]
+                  "
+                >
+                  <div
+                    className="
+                      flex
+                      h-10
+                      w-10
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-[12px]
+                      bg-slate-100
+                      text-slate-500
 
-                <div className="rounded-3xl border border-gray-200 bg-white p-6">
-                  <p className="text-xs uppercase tracking-wider text-gray-400">
-                    Pasif
-                  </p>
-
-                  <p className="mt-3 text-3xl font-semibold">
-                    {members.length - activeMembers}
-                  </p>
-                </div>
-
-              </div>
-
-              <div className="mb-6 rounded-3xl border border-gray-200 bg-white p-4">
-
-                <input
-                  value={search}
-                  onChange={(event) =>
-                    setSearch(event.target.value)
-                  }
-                  placeholder="İsim, e-posta, rol veya departman ara..."
-                  className="w-full rounded-2xl bg-gray-50 px-5 py-3 text-sm outline-none"
-                />
-
-              </div>
-
-              {members.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-gray-300 bg-white p-16 text-center">
-
-                  <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
-                    👥
+                      dark:bg-slate-800
+                      dark:text-slate-300
+                    "
+                  >
+                    <UsersRound
+                      size={18}
+                    />
                   </div>
 
-                  <h2 className="text-lg font-semibold">
-                    Henüz ekip üyesi bulunmuyor
+                  <div>
+                    <p
+                      className="
+                        text-[8px]
+                        font-bold
+                        uppercase
+                        tracking-[0.1em]
+                        text-gray-400
+                      "
+                    >
+                      Toplam Üye
+                    </p>
+
+                    <p
+                      className="
+                        mt-1
+                        text-[24px]
+                        font-bold
+                        tracking-[-0.03em]
+                      "
+                    >
+                      {
+                        members.length
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* ACTIVE */}
+
+                <div
+                  className="
+                    flex
+                    min-h-[88px]
+                    items-center
+                    gap-4
+                    rounded-[18px]
+                    border
+                    border-white/80
+                    bg-white/90
+                    px-5
+                    py-4
+                    shadow-[0_6px_22px_rgba(15,23,42,0.04)]
+                    backdrop-blur-xl
+
+                    dark:border-slate-800
+                    dark:bg-[#081321]
+                  "
+                >
+                  <div
+                    className="
+                      flex
+                      h-10
+                      w-10
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-[12px]
+                      bg-sky-50
+                      text-sky-500
+
+                      dark:bg-sky-400/10
+                      dark:text-sky-300
+                    "
+                  >
+                    <UserRound
+                      size={18}
+                    />
+                  </div>
+
+                  <div>
+                    <p
+                      className="
+                        text-[8px]
+                        font-bold
+                        uppercase
+                        tracking-[0.1em]
+                        text-gray-400
+                      "
+                    >
+                      Aktif
+                    </p>
+
+                    <p
+                      className="
+                        mt-1
+                        text-[24px]
+                        font-bold
+                        tracking-[-0.03em]
+                      "
+                    >
+                      {
+                        activeMembers
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* PASSIVE */}
+
+                <div
+                  className="
+                    flex
+                    min-h-[88px]
+                    items-center
+                    gap-4
+                    rounded-[18px]
+                    border
+                    border-white/80
+                    bg-white/90
+                    px-5
+                    py-4
+                    shadow-[0_6px_22px_rgba(15,23,42,0.04)]
+                    backdrop-blur-xl
+
+                    dark:border-slate-800
+                    dark:bg-[#081321]
+                  "
+                >
+                  <div
+                    className="
+                      flex
+                      h-10
+                      w-10
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-[12px]
+                      bg-gray-100
+                      text-gray-400
+
+                      dark:bg-slate-800
+                      dark:text-slate-500
+                    "
+                  >
+                    <UserRound
+                      size={18}
+                    />
+                  </div>
+
+                  <div>
+                    <p
+                      className="
+                        text-[8px]
+                        font-bold
+                        uppercase
+                        tracking-[0.1em]
+                        text-gray-400
+                      "
+                    >
+                      Pasif
+                    </p>
+
+                    <p
+                      className="
+                        mt-1
+                        text-[24px]
+                        font-bold
+                        tracking-[-0.03em]
+                      "
+                    >
+                      {
+                        passiveMembers
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* =================================================
+                  SEARCH
+                  ================================================= */}
+
+              <div
+                className="
+                  mb-5
+                  rounded-[18px]
+                  border
+                  border-white/80
+                  bg-white/90
+                  p-3
+                  shadow-[0_6px_22px_rgba(15,23,42,0.04)]
+                  backdrop-blur-xl
+
+                  dark:border-slate-800
+                  dark:bg-[#081321]
+                "
+              >
+                <div
+                  className="
+                    relative
+                  "
+                >
+                  <Search
+                    size={16}
+                    className="
+                      pointer-events-none
+                      absolute
+                      left-4
+                      top-1/2
+                      -translate-y-1/2
+                      text-gray-400
+
+                      dark:text-slate-500
+                    "
+                  />
+
+                  <input
+                    value={
+                      search
+                    }
+                    onChange={
+                      event =>
+                        setSearch(
+                          event.target.value
+                        )
+                    }
+                    placeholder="İsim, e-posta, rol veya departman ara..."
+                    className="
+                      w-full
+                      rounded-[12px]
+                      border
+                      border-transparent
+                      bg-gray-50/90
+                      py-3.5
+                      pl-11
+                      pr-4
+                      text-[11px]
+                      text-gray-700
+                      outline-none
+                      transition
+
+                      placeholder:text-gray-400
+
+                      focus:border-gray-200
+                      focus:bg-white
+
+                      dark:bg-slate-900
+                      dark:text-white
+                    "
+                  />
+                </div>
+              </div>
+
+              {/* =================================================
+                  EMPTY
+                  ================================================= */}
+
+              {filteredMembers.length ===
+              0 ? (
+                <div
+                  className="
+                    rounded-[24px]
+                    border
+                    border-dashed
+                    border-gray-300
+                    bg-white/80
+                    p-16
+                    text-center
+
+                    dark:border-slate-700
+                    dark:bg-[#081321]/90
+                  "
+                >
+                  <UsersRound
+                    size={28}
+                    className="
+                      mx-auto
+                      text-gray-300
+                    "
+                  />
+
+                  <h2
+                    className="
+                      mt-4
+                      text-[15px]
+                      font-semibold
+                    "
+                  >
+                    Kullanıcı bulunamadı
                   </h2>
 
-                  <p className="mt-2 text-sm text-gray-500">
-                    Görüntülenebilecek ekip bilgisi bulunamadı.
+                  <p
+                    className="
+                      mt-1
+                      text-[11px]
+                      text-gray-500
+                    "
+                  >
+                    Arama kriterlerinize
+                    uygun kullanıcı
+                    bulunamadı.
                   </p>
-
                 </div>
               ) : (
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                /* =================================================
+                   MEMBER CARDS
+                   ================================================= */
 
-                  {filteredMembers.map((member, index) => (
-                    <article
-                      key={
-                        member.id ||
-                        member.userId ||
-                        index
-                      }
-                      className="rounded-3xl border border-gray-200 bg-white p-6 transition hover:-translate-y-1 hover:shadow-lg"
-                    >
+                <div
+                  className="
+                    grid
+                    gap-5
 
-                      <div className="flex items-start justify-between">
+                    md:grid-cols-2
+                    xl:grid-cols-3
+                  "
+                >
+                  {filteredMembers.map(
+                    (
+                      member,
+                      index
+                    ) => {
+                      const active =
+                        member.isActive !==
+                        false;
 
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black text-lg font-semibold text-white">
-                          {getInitial(member)}
-                        </div>
+                      const role =
+                        member.role ||
+                        "Team Member";
 
-                        <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium">
-                          {member.isActive === false
-                            ? "Pasif"
-                            : "Aktif"}
-                        </span>
+                      return (
+                        <article
+                          key={
+                            member.id ||
+                            member.userId ||
+                            index
+                          }
+                          className="
+                            rounded-[20px]
+                            border
+                            border-white/80
+                            bg-white/92
+                            p-5
+                            shadow-[0_7px_25px_rgba(15,23,42,0.045)]
+                            backdrop-blur-xl
+                            transition
 
-                      </div>
+                            hover:-translate-y-[1px]
+                            hover:shadow-[0_12px_30px_rgba(15,23,42,0.07)]
 
-                      <h2 className="mt-5 text-lg font-semibold">
-                        {getDisplayName(member)}
-                      </h2>
+                            dark:border-slate-800
+                            dark:bg-[#081321]/95
+                          "
+                        >
+                          {/* =====================================
+                              TOP
+                              ===================================== */}
 
-                      <p className="mt-1 text-sm text-gray-500">
-                        {member.email || "E-posta yok"}
-                      </p>
+                          <div
+                            className="
+                              flex
+                              items-start
+                              justify-between
+                              gap-4
+                            "
+                          >
+                            {/* AVATAR */}
 
-                      <div className="mt-6 space-y-4 border-t border-gray-100 pt-5">
+                            <div
+                              className="
+                                flex
+                                h-11
+                                w-11
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-full
+                                bg-[#090b10]
+                                text-white
+                                shadow-sm
 
-                        <div className="flex justify-between gap-4">
-                          <span className="text-xs text-gray-400">
-                            Rol
-                          </span>
+                                dark:bg-white
+                                dark:text-black
+                              "
+                            >
+                              <UserRound
+                                size={20}
+                                strokeWidth={1.8}
+                              />
+                            </div>
 
-                          <span className="text-sm font-medium">
-                            {member.role || "Belirtilmedi"}
-                          </span>
-                        </div>
+                            {/* STATUS */}
 
-                        <div className="flex justify-between gap-4">
-                          <span className="text-xs text-gray-400">
-                            Departman
-                          </span>
+                            {active ? (
+                              <span
+                                className="
+                                  inline-flex
+                                  items-center
+                                  justify-center
+                                  rounded-[9px]
+                                  border
+                                  border-sky-300
+                                  bg-sky-50
+                                  px-3.5
+                                  py-1.5
+                                  text-[10px]
+                                  font-bold
+                                  text-sky-600
+                                  whitespace-nowrap
 
-                          <span className="text-sm font-medium">
-                            {member.department || "Belirtilmedi"}
-                          </span>
-                        </div>
+                                  dark:border-sky-400/40
+                                  dark:bg-sky-400/10
+                                  dark:text-sky-300
+                                "
+                              >
+                                Aktif
+                              </span>
+                            ) : (
+                              <span
+                                className="
+                                  inline-flex
+                                  items-center
+                                  justify-center
+                                  rounded-[9px]
+                                  border
+                                  border-gray-200
+                                  bg-gray-100
+                                  px-3.5
+                                  py-1.5
+                                  text-[10px]
+                                  font-bold
+                                  text-gray-500
+                                  whitespace-nowrap
 
-                        <div className="flex justify-between gap-4">
-                          <span className="text-xs text-gray-400">
-                            Proje
-                          </span>
+                                  dark:border-slate-700
+                                  dark:bg-slate-800
+                                  dark:text-slate-400
+                                "
+                              >
+                                Pasif
+                              </span>
+                            )}
+                          </div>
 
-                          <span className="text-sm font-medium">
-                            {member.projectName || "Belirtilmedi"}
-                          </span>
-                        </div>
+                          {/* =====================================
+                              USER
+                              ===================================== */}
 
-                      </div>
+                          <div
+                            className="
+                              mt-4
+                            "
+                          >
+                            <h2
+                              className="
+                                truncate
+                                text-[16px]
+                                font-bold
+                                tracking-[-0.02em]
+                                text-gray-900
 
-                    </article>
-                  ))}
+                                dark:text-white
+                              "
+                            >
+                              {
+                                getDisplayName(
+                                  member
+                                )
+                              }
+                            </h2>
 
+                            <p
+                              className="
+                                mt-1
+                                truncate
+                                text-[11px]
+                                font-medium
+                                text-gray-400
+
+                                dark:text-slate-500
+                              "
+                            >
+                              {member.email ||
+                                "E-posta bulunmuyor"}
+                            </p>
+                          </div>
+
+                          {/* =====================================
+                              DETAILS
+                              ===================================== */}
+
+                          <div
+                            className="
+                              mt-5
+                              space-y-3.5
+                              border-t
+                              border-gray-100
+                              pt-4
+
+                              dark:border-slate-800
+                            "
+                          >
+                            {/* ROLE */}
+
+                            <div
+                              className="
+                                flex
+                                items-center
+                                justify-between
+                                gap-4
+                              "
+                            >
+                              <span
+                                className="
+                                  text-[10px]
+                                  font-medium
+                                  text-gray-400
+
+                                  dark:text-slate-500
+                                "
+                              >
+                                Rol
+                              </span>
+
+                              <span
+                                className="
+                                  text-right
+                                  text-[11px]
+                                  font-semibold
+                                  text-gray-700
+
+                                  dark:text-slate-300
+                                "
+                              >
+                                {
+                                  role
+                                }
+                              </span>
+                            </div>
+
+                            {/* DEPARTMENT */}
+
+                            <div
+                              className="
+                                flex
+                                items-center
+                                justify-between
+                                gap-4
+                              "
+                            >
+                              <span
+                                className="
+                                  text-[10px]
+                                  font-medium
+                                  text-gray-400
+
+                                  dark:text-slate-500
+                                "
+                              >
+                                Departman
+                              </span>
+
+                              <span
+                                className="
+                                  max-w-[68%]
+                                  truncate
+                                  text-right
+                                  text-[11px]
+                                  font-semibold
+                                  text-gray-700
+
+                                  dark:text-slate-300
+                                "
+                              >
+                                {member.department ||
+                                  "Departman yok"}
+                              </span>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    }
+                  )}
                 </div>
               )}
             </>
           )}
-
       </div>
     </main>
   );

@@ -11,20 +11,19 @@ export interface RegisterRequest {
   lastName: string;
   email: string;
   password: string;
-  department?: string | null;
+  departmentId: string;
 }
 
-export interface AuthData {
+export interface AuthUserData {
   token?: string;
   accessToken?: string;
   jwtToken?: string;
-
   userId?: string;
   firstName?: string;
   lastName?: string;
   email?: string;
-  role?: string;
-
+  roles?: string[];
+  tokenExpiration?: string;
   [key: string]: unknown;
 }
 
@@ -34,145 +33,245 @@ export interface ApiResponse<T> {
   data?: T;
 }
 
-function extractToken(result: unknown): string | null {
-  if (!result || typeof result !== "object") {
+function extractToken(
+  result: unknown
+): string | null {
+  if (
+    !result ||
+    typeof result !== "object"
+  ) {
     return null;
   }
 
-  const response = result as Record<string, unknown>;
+  const response =
+    result as Record<
+      string,
+      unknown
+    >;
 
-  if (typeof response.token === "string") {
-    return response.token;
-  }
+  for (const key of [
+    "token",
+    "accessToken",
+    "jwtToken",
+  ]) {
+    const value =
+      response[key];
 
-  if (typeof response.accessToken === "string") {
-    return response.accessToken;
-  }
-
-  if (typeof response.jwtToken === "string") {
-    return response.jwtToken;
+    if (
+      typeof value === "string" &&
+      value.trim()
+    ) {
+      return value;
+    }
   }
 
   if (
     response.data &&
-    typeof response.data === "object"
+    typeof response.data ===
+      "object"
   ) {
-    const data = response.data as Record<string, unknown>;
+    const data =
+      response.data as Record<
+        string,
+        unknown
+      >;
 
-    if (typeof data.token === "string") {
-      return data.token;
-    }
+    for (const key of [
+      "token",
+      "accessToken",
+      "jwtToken",
+    ]) {
+      const value =
+        data[key];
 
-    if (typeof data.accessToken === "string") {
-      return data.accessToken;
-    }
-
-    if (typeof data.jwtToken === "string") {
-      return data.jwtToken;
+      if (
+        typeof value === "string" &&
+        value.trim()
+      ) {
+        return value;
+      }
     }
   }
 
   return null;
 }
 
-function saveToken(token: string) {
-  if (typeof window === "undefined") {
+function saveToken(
+  token: string
+): void {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
     return;
   }
 
-  localStorage.setItem("token", token);
-  localStorage.setItem("accessToken", token);
+  localStorage.setItem(
+    "token",
+    token
+  );
+
+  localStorage.setItem(
+    "accessToken",
+    token
+  );
+
+  sessionStorage.setItem(
+    "heweso_token",
+    token
+  );
 }
 
-export function getStoredToken(): string | null {
-  if (typeof window === "undefined") {
+export function getStoredToken():
+  | string
+  | null {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
     return null;
   }
 
   return (
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken")
+    localStorage.getItem(
+      "token"
+    ) ||
+    localStorage.getItem(
+      "accessToken"
+    ) ||
+    sessionStorage.getItem(
+      "heweso_token"
+    )
   );
 }
 
-export function logout() {
-  if (typeof window === "undefined") {
+export function getStoredUser():
+  | AuthUserData
+  | null {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return null;
+  }
+
+  const localUser =
+    localStorage.getItem(
+      "user"
+    );
+
+  const sessionUser =
+    sessionStorage.getItem(
+      "heweso_user"
+    );
+
+  const raw =
+    localUser ||
+    sessionUser;
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(
+      raw
+    ) as AuthUserData;
+  } catch {
+    return null;
+  }
+}
+
+export function logout(): void {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
     return;
   }
 
-  localStorage.removeItem("token");
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("user");
+  localStorage.removeItem(
+    "token"
+  );
+
+  localStorage.removeItem(
+    "accessToken"
+  );
+
+  localStorage.removeItem(
+    "user"
+  );
+
+  sessionStorage.removeItem(
+    "heweso_token"
+  );
+
+  sessionStorage.removeItem(
+    "heweso_user"
+  );
 }
 
-/*
-  İKİ KULLANIMI DA DESTEKLER:
-
-  login("mail@heweso.com", "Test1234")
-
-  veya
-
-  login({
-    email: "mail@heweso.com",
-    password: "Test1234"
-  })
-*/
 export async function login(
-  emailOrRequest: string | LoginRequest,
+  emailOrRequest:
+    | string
+    | LoginRequest,
   password?: string
-): Promise<any> {
-  let request: LoginRequest;
+): Promise<
+  ApiResponse<AuthUserData>
+> {
+  const request: LoginRequest =
+    typeof emailOrRequest ===
+    "string"
+      ? {
+          email:
+            emailOrRequest.trim(),
+          password:
+            password ?? "",
+        }
+      : {
+          email:
+            emailOrRequest.email.trim(),
+          password:
+            emailOrRequest.password,
+        };
 
-  if (typeof emailOrRequest === "string") {
-    request = {
-      email: emailOrRequest.trim(),
-      password: password ?? "",
-    };
-  } else {
-    request = {
-      email: emailOrRequest.email.trim(),
-      password: emailOrRequest.password,
-    };
-  }
-
-  console.log("Login isteği gönderiliyor:", {
-    email: request.email,
-    passwordLength: request.password.length,
-  });
-
-  const response = await fetch(`${API_URL}/api/Auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      email: request.email,
-      password: request.password,
-    }),
-  });
-
-  const result = await response.json().catch(() => null);
-
-  console.log("Login API response:", result);
-
-  if (!response.ok) {
-    const message =
-      result?.message ||
-      result?.title ||
-      "E-posta veya şifre hatalı.";
-
-    throw new Error(message);
-  }
-
-  const token = extractToken(result);
-
-  if (!token) {
-    console.error(
-      "Backend başarılı cevap verdi fakat token bulunamadı:",
-      result
+  const response =
+    await fetch(
+      `${API_URL}/api/Auth/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+          Accept:
+            "application/json",
+        },
+        body: JSON.stringify(
+          request
+        ),
+      }
     );
 
+  const result =
+    (await response
+      .json()
+      .catch(
+        () => null
+      )) as
+      | ApiResponse<AuthUserData>
+      | null;
+
+  if (!response.ok) {
+    throw new Error(
+      result?.message ||
+        "E-posta veya şifre hatalı."
+    );
+  }
+
+  const token =
+    extractToken(result);
+
+  if (!token) {
     throw new Error(
       "Giriş başarılı ancak JWT token alınamadı."
     );
@@ -180,70 +279,93 @@ export async function login(
 
   saveToken(token);
 
-  /*
-    Backend kullanıcı bilgilerini data içinde dönüyorsa
-    localStorage'a da kaydediyoruz.
-  */
   if (
-    typeof window !== "undefined" &&
-    result?.data &&
-    typeof result.data === "object"
+    typeof window !==
+      "undefined" &&
+    result?.data
   ) {
     localStorage.setItem(
       "user",
-      JSON.stringify(result.data)
+      JSON.stringify(
+        result.data
+      )
+    );
+
+    sessionStorage.setItem(
+      "heweso_user",
+      JSON.stringify(
+        result.data
+      )
     );
   }
 
-  /*
-    ÖNEMLİ:
-    Eski login/page.tsx hangi response yapısını
-    bekliyorsa onu bozmuyoruz.
-  */
-  return result;
+  return (
+    result ?? {
+      isSuccess: true,
+    }
+  );
 }
 
 export async function register(
   request: RegisterRequest
-): Promise<any> {
-  const response = await fetch(
-    `${API_URL}/api/Auth/register`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        firstName: request.firstName.trim(),
-        lastName: request.lastName.trim(),
-        email: request.email.trim(),
-        password: request.password,
-        department: request.department ?? null,
-      }),
-    }
-  );
+): Promise<
+  ApiResponse<AuthUserData>
+> {
+  const response =
+    await fetch(
+      `${API_URL}/api/Auth/register`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+          Accept:
+            "application/json",
+        },
+        body: JSON.stringify({
+          firstName:
+            request.firstName.trim(),
+          lastName:
+            request.lastName.trim(),
+          email:
+            request.email.trim(),
+          password:
+            request.password,
+          departmentId:
+            request.departmentId,
+        }),
+      }
+    );
 
-  const result = await response.json().catch(() => null);
+  const result =
+    (await response
+      .json()
+      .catch(
+        () => null
+      )) as
+      | ApiResponse<AuthUserData>
+      | null;
 
   if (!response.ok) {
-    const message =
+    throw new Error(
       result?.message ||
-      result?.title ||
-      "Kayıt oluşturulurken bir hata oluştu.";
-
-    throw new Error(message);
+        "Kayıt oluşturulurken bir hata oluştu."
+    );
   }
 
-  return result;
+  return (
+    result ?? {
+      isSuccess: true,
+    }
+  );
 }
 
 export const authService = {
   login,
   register,
   logout,
-
-  getToken: getStoredToken,
-
+  getToken:
+    getStoredToken,
   getStoredToken,
+  getStoredUser,
 };

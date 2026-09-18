@@ -1,23 +1,36 @@
 using HewesoFlow.Application.Abstractions.Notifications;
 using HewesoFlow.Application.Abstractions.ProjectTasks;
+
 using HewesoFlow.Application.Features.Notifications.DTOs;
 using HewesoFlow.Application.Features.ProjectTasks.DTOs;
+
 using HewesoFlow.Domain.Enums;
 
 namespace HewesoFlow.Persistence.ProjectTasks.Services;
 
-public class NotificationProjectTaskService : IProjectTaskService
+public class NotificationProjectTaskService :
+    IProjectTaskService
 {
-    private readonly ProjectTaskService _innerService;
-    private readonly INotificationService _notificationService;
+    private readonly ProjectTaskService
+        _innerService;
+
+    private readonly INotificationService
+        _notificationService;
 
     public NotificationProjectTaskService(
         ProjectTaskService innerService,
         INotificationService notificationService)
     {
-        _innerService = innerService;
-        _notificationService = notificationService;
+        _innerService =
+            innerService;
+
+        _notificationService =
+            notificationService;
     }
+
+    /* =========================================================
+       CREATE
+       ========================================================= */
 
     public async Task<ProjectTaskResponseDto> CreateAsync(
         CreateProjectTaskRequestDto request,
@@ -30,9 +43,23 @@ public class NotificationProjectTaskService : IProjectTaskService
                 currentUserId,
                 cancellationToken);
 
-        if (result.AssignedUserId.HasValue &&
-            result.AssignedUserId.Value != currentUserId)
+        /*
+         * Yeni görev bildirimi yalnızca
+         * görevin atandığı kullanıcıya gider.
+         *
+         * Admin'e herhangi bir görev
+         * bildirimi gönderilmez.
+         */
+        if (
+            result.AssignedUserId.HasValue &&
+            result.AssignedUserId.Value !=
+                currentUserId
+        )
         {
+            var isCritical =
+                result.Priority ==
+                TaskPriority.Critical;
+
             await CreateNotificationSafeAsync(
                 new CreateNotificationRequestDto
                 {
@@ -40,10 +67,14 @@ public class NotificationProjectTaskService : IProjectTaskService
                         result.AssignedUserId.Value,
 
                     Title =
-                        "Yeni görev atandı",
+                        isCritical
+                            ? "Kritik görev eklendi"
+                            : "Yeni görev atandı",
 
                     Message =
-                        $"\"{result.Title}\" görevi size atandı.",
+                        isCritical
+                            ? $"\"{result.Title}\" görevi size kritik öncelikle atandı."
+                            : $"\"{result.Title}\" görevi size atandı.",
 
                     Type =
                         NotificationType.TaskAssigned,
@@ -60,10 +91,15 @@ public class NotificationProjectTaskService : IProjectTaskService
         return result;
     }
 
-    public async Task<IReadOnlyList<ProjectTaskResponseDto>> GetAllAsync(
-        ProjectTaskFilterDto filter,
-        Guid currentUserId,
-        CancellationToken cancellationToken = default)
+    /* =========================================================
+       GET ALL
+       ========================================================= */
+
+    public async Task<IReadOnlyList<ProjectTaskResponseDto>>
+        GetAllAsync(
+            ProjectTaskFilterDto filter,
+            Guid currentUserId,
+            CancellationToken cancellationToken = default)
     {
         return await _innerService.GetAllAsync(
             filter,
@@ -71,16 +107,25 @@ public class NotificationProjectTaskService : IProjectTaskService
             cancellationToken);
     }
 
-    public async Task<ProjectTaskResponseDto> GetByIdAsync(
-        Guid taskId,
-        Guid currentUserId,
-        CancellationToken cancellationToken = default)
+    /* =========================================================
+       GET BY ID
+       ========================================================= */
+
+    public async Task<ProjectTaskResponseDto>
+        GetByIdAsync(
+            Guid taskId,
+            Guid currentUserId,
+            CancellationToken cancellationToken = default)
     {
         return await _innerService.GetByIdAsync(
             taskId,
             currentUserId,
             cancellationToken);
     }
+
+    /* =========================================================
+       UPDATE
+       ========================================================= */
 
     public async Task<ProjectTaskResponseDto> UpdateAsync(
         Guid taskId,
@@ -107,10 +152,25 @@ public class NotificationProjectTaskService : IProjectTaskService
         var newAssignedUserId =
             result.AssignedUserId;
 
-        if (oldAssignedUserId != newAssignedUserId &&
+        /*
+         * Görev başka kullanıcıya
+         * atandıysa yeni kullanıcı
+         * bildirim alır.
+         */
+        if (
+            oldAssignedUserId !=
+                newAssignedUserId &&
+
             newAssignedUserId.HasValue &&
-            newAssignedUserId.Value != currentUserId)
+
+            newAssignedUserId.Value !=
+                currentUserId
+        )
         {
+            var isCritical =
+                result.Priority ==
+                TaskPriority.Critical;
+
             await CreateNotificationSafeAsync(
                 new CreateNotificationRequestDto
                 {
@@ -118,10 +178,14 @@ public class NotificationProjectTaskService : IProjectTaskService
                         newAssignedUserId.Value,
 
                     Title =
-                        "Görev size atandı",
+                        isCritical
+                            ? "Kritik görev eklendi"
+                            : "Görev size atandı",
 
                     Message =
-                        $"\"{result.Title}\" görevi size atandı.",
+                        isCritical
+                            ? $"\"{result.Title}\" görevi size kritik öncelikle atandı."
+                            : $"\"{result.Title}\" görevi size atandı.",
 
                     Type =
                         NotificationType.TaskAssigned,
@@ -137,6 +201,10 @@ public class NotificationProjectTaskService : IProjectTaskService
 
         return result;
     }
+
+    /* =========================================================
+       UPDATE STATUS
+       ========================================================= */
 
     public async Task<ProjectTaskResponseDto> UpdateStatusAsync(
         Guid taskId,
@@ -157,9 +225,20 @@ public class NotificationProjectTaskService : IProjectTaskService
                 currentUserId,
                 cancellationToken);
 
-        if (oldTask.Status != result.Status &&
+        /*
+         * Durumu değiştiren kişi dışında
+         * görevin atanmış olduğu kişi
+         * durum değişikliğini görebilir.
+         */
+        if (
+            oldTask.Status !=
+                result.Status &&
+
             result.AssignedUserId.HasValue &&
-            result.AssignedUserId.Value != currentUserId)
+
+            result.AssignedUserId.Value !=
+                currentUserId
+        )
         {
             await CreateNotificationSafeAsync(
                 new CreateNotificationRequestDto
@@ -185,8 +264,24 @@ public class NotificationProjectTaskService : IProjectTaskService
                 cancellationToken);
         }
 
+        /*
+         * NOT:
+         *
+         * Buradan Admin'e hiçbir
+         * bildirim gönderilmiyor.
+         *
+         * Görev tamamlandı bildiriminin
+         * Project Manager'a gönderilmesini
+         * sonraki dosyada proje bilgisi
+         * üzerinden ekleyeceğiz.
+         */
+
         return result;
     }
+
+    /* =========================================================
+       DELETE
+       ========================================================= */
 
     public async Task DeleteAsync(
         Guid taskId,
@@ -198,6 +293,10 @@ public class NotificationProjectTaskService : IProjectTaskService
             currentUserId,
             cancellationToken);
     }
+
+    /* =========================================================
+       SAFE NOTIFICATION
+       ========================================================= */
 
     private async Task CreateNotificationSafeAsync(
         CreateNotificationRequestDto request,
@@ -211,10 +310,16 @@ public class NotificationProjectTaskService : IProjectTaskService
         }
         catch
         {
-            // Bildirim oluşturulamaması,
-            // asıl görev işlemini başarısız hale getirmemeli.
+            /*
+             * Bildirim hatası ana görev
+             * işlemini bozmasın.
+             */
         }
     }
+
+    /* =========================================================
+       STATUS TEXT
+       ========================================================= */
 
     private static string GetStatusText(
         ProjectTaskStatus status)

@@ -120,6 +120,27 @@ public class AuthService : IAuthService
                 "Bu e-posta adresiyle daha önce kayıt oluşturulmuş.");
         }
 
+        if (!request.DepartmentId.HasValue)
+        {
+            return AuthServiceResultDto.Failure(
+                "Kayıt olmak için bir departman seçmelisiniz.");
+        }
+
+        var selectedDepartment =
+            await _dbContext.Departments
+                .FirstOrDefaultAsync(
+                    department =>
+                        department.Id == request.DepartmentId.Value &&
+                        department.IsActive &&
+                        !department.IsDeleted,
+                    cancellationToken);
+
+        if (selectedDepartment is null)
+        {
+            return AuthServiceResultDto.Failure(
+                "Seçilen departman bulunamadı veya aktif değil.");
+        }
+
         var user =
             new User
             {
@@ -132,11 +153,8 @@ public class AuthService : IAuthService
                 Email =
                     email,
 
-                Department =
-                    string.IsNullOrWhiteSpace(
-                        request.Department)
-                        ? null
-                        : request.Department.Trim(),
+                Department = selectedDepartment.Name,
+                DepartmentId = selectedDepartment.Id,
 
                 IsActive =
                     true,

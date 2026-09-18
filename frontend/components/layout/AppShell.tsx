@@ -1,211 +1,46 @@
 "use client";
 
 import {
-  ReactNode,
+  type ReactNode,
   useEffect,
+  useMemo,
   useState,
 } from "react";
+
+import {
+  BarChart3,
+  Bell,
+  Building2,
+  CalendarDays,
+  ChevronLeft,
+  FolderKanban,
+  LayoutDashboard,
+  ListTodo,
+  LogOut,
+  Menu,
+  Moon,
+  Palette,
+  ShieldCheck,
+  Sun,
+  Users,
+} from "lucide-react";
 
 import {
   usePathname,
   useRouter,
 } from "next/navigation";
 
-import {
-  getStoredToken,
-  logout,
-} from "@/services/authService";
+import { useAppearance } from "../../contexts/AppearanceContext";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { logout } from "../../services/authService";
 
 type AppShellProps = {
   children: ReactNode;
 };
 
-type CurrentUser = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-};
-
 type ThemeMode =
   | "light"
   | "dark";
-
-type JwtPayload = {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-
-  role?: string;
-
-  [key: string]:
-    | string
-    | string[]
-    | number
-    | boolean
-    | undefined;
-};
-
-function decodeToken(
-  token: string
-): JwtPayload | null {
-  try {
-    const payload =
-      token.split(".")[1];
-
-    if (!payload) {
-      return null;
-    }
-
-    const normalized =
-      payload
-        .replace(/-/g, "+")
-        .replace(/_/g, "/");
-
-    const decoded =
-      decodeURIComponent(
-        window
-          .atob(normalized)
-          .split("")
-          .map(
-            (char) =>
-              "%" +
-              (
-                "00" +
-                char
-                  .charCodeAt(0)
-                  .toString(16)
-              ).slice(-2)
-          )
-          .join("")
-      );
-
-    return JSON.parse(
-      decoded
-    );
-  } catch {
-    return null;
-  }
-}
-
-function getUserFromToken():
-  | CurrentUser
-  | null {
-  if (
-    typeof window ===
-    "undefined"
-  ) {
-    return null;
-  }
-
-  const token =
-    getStoredToken();
-
-  if (!token) {
-    return null;
-  }
-
-  const payload =
-    decodeToken(token);
-
-  if (!payload) {
-    return null;
-  }
-
-  const microsoftRole =
-    payload[
-      "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
-    ];
-
-  const microsoftEmail =
-    payload[
-      "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
-    ];
-
-  const microsoftName =
-    payload[
-      "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
-    ];
-
-  let role = "";
-
-  if (
-    typeof payload.role ===
-    "string"
-  ) {
-    role =
-      payload.role;
-  } else if (
-    typeof microsoftRole ===
-    "string"
-  ) {
-    role =
-      microsoftRole;
-  } else if (
-    Array.isArray(
-      microsoftRole
-    )
-  ) {
-    role =
-      microsoftRole[0] ??
-      "";
-  }
-
-  const email =
-    typeof payload.email ===
-    "string"
-      ? payload.email
-      : typeof microsoftEmail ===
-          "string"
-        ? microsoftEmail
-        : "";
-
-  let firstName =
-    typeof payload.firstName ===
-    "string"
-      ? payload.firstName
-      : "";
-
-  let lastName =
-    typeof payload.lastName ===
-    "string"
-      ? payload.lastName
-      : "";
-
-  if (
-    !firstName &&
-    typeof microsoftName ===
-      "string"
-  ) {
-    const parts =
-      microsoftName
-        .trim()
-        .split(" ");
-
-    firstName =
-      parts[0] ?? "";
-
-    lastName =
-      parts
-        .slice(1)
-        .join(" ");
-  }
-
-  return {
-    firstName,
-    lastName,
-    email,
-    role,
-  };
-}
-
-function normalizeRole(
-  role: string
-) {
-  return role
-    .replace(/\s/g, "")
-    .toLowerCase();
-}
 
 function applyTheme(
   theme: ThemeMode
@@ -225,12 +60,20 @@ export default function AppShell({
   const router =
     useRouter();
 
-  const [user, setUser] =
-    useState<CurrentUser | null>(
-      null
-    );
+  const {
+    appearance,
+  } = useAppearance();
 
-  const [theme, setTheme] =
+  const {
+    user,
+    isAdmin,
+    isProjectManager,
+  } = useCurrentUser();
+
+  const [
+    theme,
+    setTheme,
+  ] =
     useState<ThemeMode>(
       "light"
     );
@@ -238,21 +81,14 @@ export default function AppShell({
   const [
     themeReady,
     setThemeReady,
-  ] = useState(false);
+  ] =
+    useState(false);
 
-  /* =========================
-     USER
-  ========================= */
-
-  useEffect(() => {
-    setUser(
-      getUserFromToken()
-    );
-  }, [pathname]);
-
-  /* =========================
-     THEME INITIAL LOAD
-  ========================= */
+  const [
+    sidebarOpen,
+    setSidebarOpen,
+  ] =
+    useState(true);
 
   useEffect(() => {
     const storedTheme =
@@ -261,72 +97,101 @@ export default function AppShell({
       );
 
     let initialTheme:
-      ThemeMode =
-      "light";
+      ThemeMode = "light";
 
     if (
-      storedTheme ===
-        "dark" ||
-      storedTheme ===
-        "light"
+      storedTheme === "light" ||
+      storedTheme === "dark"
     ) {
       initialTheme =
         storedTheme;
-    } else {
-      const prefersDark =
-        window.matchMedia(
-          "(prefers-color-scheme: dark)"
-        ).matches;
-
+    } else if (
+      window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches
+    ) {
       initialTheme =
-        prefersDark
-          ? "dark"
-          : "light";
+        "dark";
     }
 
-    setTheme(
-      initialTheme
-    );
-
-    applyTheme(
-      initialTheme
-    );
-
+    setTheme(initialTheme);
+    applyTheme(initialTheme);
     setThemeReady(true);
   }, []);
 
-  /* =========================
-     THEME CHANGE
-  ========================= */
-
-  function toggleTheme() {
-    const newTheme:
-      ThemeMode =
-      theme === "light"
-        ? "dark"
-        : "light";
-
-    setTheme(newTheme);
-
-    localStorage.setItem(
-      "heweso-theme",
-      newTheme
-    );
-
-    applyTheme(
-      newTheme
-    );
-  }
-
-  /* =========================
-     PUBLIC PAGES
-  ========================= */
-
-  const publicPages =
+  const publicPage =
     pathname === "/login" ||
     pathname === "/register";
 
-  if (publicPages) {
+  const canManage =
+    isAdmin ||
+    isProjectManager;
+
+  const menuItems =
+    useMemo(
+      () => [
+        {
+          label: "Dashboard",
+          href: "/",
+          icon: LayoutDashboard,
+          show: true,
+        },
+        {
+          label: "Projeler",
+          href: "/projects",
+          icon: FolderKanban,
+          show: true,
+        },
+        {
+          label: "Görevlerim",
+          href: "/my-tasks",
+          icon: ListTodo,
+          show: !isAdmin,
+        },
+        {
+          label: "Takvim",
+          href: "/calendar",
+          icon: CalendarDays,
+          show: true,
+        },
+        {
+          label: "Ekip",
+          href: "/team",
+          icon: Users,
+          show: canManage,
+        },
+        {
+          label: "Departmanlar",
+          href: "/departments",
+          icon: Building2,
+          show: canManage,
+        },
+        {
+          label: "Raporlar",
+          href: "/reports",
+          icon: BarChart3,
+          show: canManage,
+        },
+        {
+          label: "Admin",
+          href: "/admin",
+          icon: ShieldCheck,
+          show: isAdmin,
+        },
+        {
+          label: "Görünüm",
+          href: "/appearance",
+          icon: Palette,
+          show: isAdmin,
+        },
+      ],
+      [
+        canManage,
+        isAdmin,
+      ]
+    );
+
+  if (publicPage) {
     return (
       <div className="app-shell">
         {children}
@@ -334,102 +199,31 @@ export default function AppShell({
     );
   }
 
-  /* =========================
-     ROLES
-  ========================= */
-
-  const role =
-    normalizeRole(
-      user?.role ?? ""
-    );
-
-  const isAdmin =
-    role === "admin";
-
-  const isManager =
-    role ===
-    "projectmanager";
-
-  const canManage =
-    isAdmin ||
-    isManager;
-
-  /* =========================
-     MENU
-  ========================= */
-
-  const menuItems = [
-    {
-      label: "Dashboard",
-      href: "/",
-      icon: "⌂",
-      show: true,
-    },
-
-    {
-      label: "Projeler",
-      href: "/projects",
-      icon: "◫",
-      show: true,
-    },
-
-    {
-      label: "Görevlerim",
-      href: "/my-tasks",
-      icon: "✓",
-      show: true,
-    },
-
-    {
-      label: "Takvim",
-      href: "/calendar",
-      icon: "□",
-      show: true,
-    },
-
-    {
-      label: "Ekip",
-      href: "/team",
-      icon: "♙",
-      show: canManage,
-    },
-
-    {
-      label:
-        "Departmanlar",
-      href:
-        "/departments",
-      icon: "◇",
-      show: canManage,
-    },
-
-    {
-      label: "Raporlar",
-      href: "/reports",
-      icon: "⌁",
-      show: canManage,
-    },
-
-    {
-      label: "Admin",
-      href: "/admin",
-      icon: "⚙",
-      show: isAdmin,
-    },
-  ];
-
   function isActive(
     href: string
   ) {
-    if (href === "/") {
-      return (
-        pathname === "/"
-      );
-    }
+    return href === "/"
+      ? pathname === "/"
+      : pathname.startsWith(
+          href
+        );
+  }
 
-    return pathname.startsWith(
-      href
+  function toggleTheme() {
+    const nextTheme:
+      ThemeMode =
+      theme === "light"
+        ? "dark"
+        : "light";
+
+    setTheme(nextTheme);
+
+    localStorage.setItem(
+      "heweso-theme",
+      nextTheme
     );
+
+    applyTheme(nextTheme);
   }
 
   function handleLogout() {
@@ -440,182 +234,95 @@ export default function AppShell({
     );
   }
 
+  const fullName =
+    `${
+      user?.firstName ?? ""
+    } ${
+      user?.lastName ?? ""
+    }`.trim() ||
+    user?.email ||
+    "Kullanıcı";
+
+  const visibleCompanyName =
+    appearance.companyName?.trim() ||
+    "Heweso";
+
   return (
     <div className="app-shell">
-      {/* =========================
-          TOP BAR
-      ========================= */}
-
-      <header className="heweso-topbar sticky top-0 z-40 border-b">
-        <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between px-6">
-
-          {/* LOGO */}
-
-          <button
-            type="button"
-            onClick={() =>
-              router.push("/")
-            }
-            className="flex items-center gap-3"
+      <aside
+        className={`heweso-sidebar ${
+          sidebarOpen
+            ? "heweso-sidebar-open"
+            : "heweso-sidebar-closed"
+        }`}
+      >
+        <div className="flex h-full flex-col">
+          <div
+            className={`flex h-[74px] shrink-0 items-center ${
+              sidebarOpen
+                ? "justify-between px-4"
+                : "justify-center"
+            }`}
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-black text-sm font-semibold text-white">
-              H
-            </div>
+            {sidebarOpen && (
+              <div className="select-none">
+                <p className="heweso-sidebar-brand-small">
+                  {visibleCompanyName.toUpperCase()}
+                </p>
 
-            <div className="hidden text-left sm:block">
-              <p className="text-sm font-semibold tracking-tight">
-                HewesoFlow
-              </p>
-
-              <p className="text-[10px] text-gray-400">
-                Work Management
-              </p>
-            </div>
-          </button>
-
-          {/* RIGHT SIDE */}
-
-          <div className="flex items-center gap-2">
-
-            {/* SEARCH */}
-
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  "/search"
-                )
-              }
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-sm transition hover:bg-gray-50"
-              title="Ara"
-            >
-              ⌕
-            </button>
-
-            {/* NOTIFICATIONS */}
+                <p
+                  className="heweso-sidebar-brand"
+                  style={{
+                    color:
+                      theme === "dark"
+                        ? "#ffffff"
+                        : "#000000",
+                  }}
+                >
+                  Flow
+                </p>
+              </div>
+            )}
 
             <button
               type="button"
               onClick={() =>
-                router.push(
-                  "/notifications"
+                setSidebarOpen(
+                  (current) =>
+                    !current
                 )
               }
-              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-sm transition hover:bg-gray-50"
-              title="Bildirimler"
-            >
-              ♢
-            </button>
-
-            {/* THEME */}
-
-            <button
-              type="button"
-              onClick={
-                toggleTheme
-              }
-              className="flex h-9 min-w-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-2.5 text-sm transition hover:bg-gray-50"
+              className="heweso-sidebar-collapse"
               title={
-                theme ===
-                "light"
-                  ? "Koyu moda geç"
-                  : "Aydınlık moda geç"
+                sidebarOpen
+                  ? "Menüyü daralt"
+                  : "Menüyü aç"
               }
             >
-              <span>
-                {!themeReady
-                  ? "◐"
-                  : theme ===
-                      "light"
-                    ? "☀"
-                    : "☾"}
-              </span>
-
-              <span className="hidden text-[11px] font-medium lg:block">
-                {theme ===
-                "light"
-                  ? "Aydınlık"
-                  : "Koyu"}
-              </span>
-            </button>
-
-            <div className="mx-1 hidden h-7 w-px bg-gray-200 sm:block" />
-
-            {/* USER */}
-
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  "/settings"
-                )
-              }
-              className="hidden items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-gray-100 sm:flex"
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
-                {user?.firstName
-                  ?.charAt(0)
-                  .toUpperCase() ||
-                  user?.email
-                    ?.charAt(0)
-                    .toUpperCase() ||
-                  "U"}
-              </div>
-
-              <div className="max-w-[150px] text-left">
-                <p className="truncate text-xs font-semibold">
-                  {user?.firstName ||
-                  user?.lastName
-                    ? `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim()
-                    : user?.email ||
-                      "Kullanıcı"}
-                </p>
-
-                <p className="truncate text-[10px] text-gray-400">
-                  {user?.role ||
-                    "Kullanıcı"}
-                </p>
-              </div>
-            </button>
-
-            {/* LOGOUT */}
-
-            <button
-              type="button"
-              onClick={
-                handleLogout
-              }
-              className="ml-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
-            >
-              Çıkış
+              {sidebarOpen ? (
+                <ChevronLeft
+                  size={17}
+                  strokeWidth={2}
+                />
+              ) : (
+                <Menu
+                  size={18}
+                  strokeWidth={2}
+                />
+              )}
             </button>
           </div>
-        </div>
-      </header>
 
-      {/* =========================
-          PAGE CONTENT
-      ========================= */}
+          <nav className="heweso-sidebar-menu">
+            {menuItems
+              .filter(
+                (item) =>
+                  item.show
+              )
+              .map((item) => {
+                const Icon =
+                  item.icon;
 
-      <div className="relative z-10 pb-32">
-        {children}
-      </div>
-
-      {/* =========================
-          BOTTOM NAVBAR
-      ========================= */}
-
-      <nav className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-24px)] max-w-fit -translate-x-1/2">
-
-        <div className="heweso-navbar flex items-center gap-1 rounded-[24px] border p-1.5 shadow-xl shadow-black/10">
-
-          {menuItems
-            .filter(
-              (item) =>
-                item.show
-            )
-            .map(
-              (item) => {
                 const active =
                   isActive(
                     item.href
@@ -632,35 +339,220 @@ export default function AppShell({
                         item.href
                       )
                     }
-                    className={`group flex h-12 items-center gap-2 rounded-[18px] px-3 transition-all duration-200 sm:px-4 ${
+                    title={
+                      !sidebarOpen
+                        ? item.label
+                        : undefined
+                    }
+                    className={`heweso-sidebar-item ${
                       active
-                        ? "bg-black text-white"
-                        : "text-gray-500 hover:bg-gray-100"
+                        ? "heweso-sidebar-item-active"
+                        : ""
+                    } ${
+                      sidebarOpen
+                        ? "heweso-sidebar-item-open"
+                        : "heweso-sidebar-item-closed"
                     }`}
                   >
-                    <span className="text-base">
-                      {
-                        item.icon
-                      }
-                    </span>
-
-                    <span
-                      className={`hidden whitespace-nowrap text-xs font-medium md:block ${
+                    <Icon
+                      size={18}
+                      strokeWidth={
                         active
-                          ? "text-white"
-                          : ""
-                      }`}
-                    >
-                      {
-                        item.label
+                          ? 2.15
+                          : 1.8
                       }
-                    </span>
+                    />
+
+                    {sidebarOpen && (
+                      <span className="heweso-sidebar-label">
+                        {
+                          item.label
+                        }
+                      </span>
+                    )}
                   </button>
                 );
+              })}
+          </nav>
+
+          <div className="flex-1" />
+
+          <div className="heweso-sidebar-tools">
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  "/notifications"
+                )
               }
-            )}
+              title={
+                !sidebarOpen
+                  ? "Bildirimler"
+                  : undefined
+              }
+              className={`heweso-sidebar-tool ${
+                sidebarOpen
+                  ? "heweso-sidebar-tool-open"
+                  : "heweso-sidebar-tool-closed"
+              }`}
+            >
+              <Bell
+                size={18}
+                strokeWidth={1.9}
+              />
+
+              {sidebarOpen && (
+                <>
+                  <span className="flex-1 text-left">
+                    Bildirimler
+                  </span>
+
+                  <span className="heweso-notification-dot" />
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={
+                toggleTheme
+              }
+              title={
+                !sidebarOpen
+                  ? theme ===
+                    "light"
+                    ? "Koyu moda geç"
+                    : "Aydınlık moda geç"
+                  : undefined
+              }
+              className={`heweso-sidebar-tool ${
+                sidebarOpen
+                  ? "heweso-sidebar-tool-open"
+                  : "heweso-sidebar-tool-closed"
+              }`}
+            >
+              {!themeReady ? (
+                <div className="h-[18px] w-[18px]" />
+              ) : theme ===
+                "light" ? (
+                <Moon
+                  size={18}
+                  strokeWidth={
+                    1.9
+                  }
+                />
+              ) : (
+                <Sun
+                  size={18}
+                  strokeWidth={
+                    1.9
+                  }
+                />
+              )}
+
+              {sidebarOpen && (
+                <>
+                  <span className="flex-1 text-left">
+                    {theme ===
+                    "light"
+                      ? "Koyu Tema"
+                      : "Aydınlık Tema"}
+                  </span>
+
+                  <span className="heweso-theme-state">
+                    Aç
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="heweso-sidebar-footer">
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  "/settings"
+                )
+              }
+              title={
+                !sidebarOpen
+                  ? fullName
+                  : undefined
+              }
+              className={`heweso-sidebar-user ${
+                sidebarOpen
+                  ? "justify-start"
+                  : "justify-center"
+              }`}
+            >
+              <div className="heweso-sidebar-avatar">
+                {user?.firstName
+                  ?.charAt(0)
+                  .toUpperCase() ||
+                  user?.email
+                    ?.charAt(0)
+                    .toUpperCase() ||
+                  "U"}
+              </div>
+
+              {sidebarOpen && (
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="heweso-sidebar-user-name">
+                    {fullName}
+                  </p>
+
+                  <p className="heweso-sidebar-user-role">
+                    {user
+                      ?.roles?.[0] ||
+                      "Kullanıcı"}
+                  </p>
+                </div>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={
+                handleLogout
+              }
+              title={
+                !sidebarOpen
+                  ? "Çıkış"
+                  : undefined
+              }
+              className={`heweso-sidebar-logout ${
+                sidebarOpen
+                  ? "justify-start"
+                  : "justify-center"
+              }`}
+            >
+              <LogOut
+                size={17}
+                strokeWidth={1.9}
+              />
+
+              {sidebarOpen && (
+                <span>
+                  Çıkış
+                </span>
+              )}
+            </button>
+          </div>
         </div>
-      </nav>
+      </aside>
+
+      <div
+        className={`min-h-screen transition-[padding] duration-300 ease-out ${
+          sidebarOpen
+            ? "pl-[230px]"
+            : "pl-[76px]"
+        }`}
+      >
+        <div className="relative z-10 min-h-screen">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

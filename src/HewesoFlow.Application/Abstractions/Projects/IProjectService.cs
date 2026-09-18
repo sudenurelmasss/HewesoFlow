@@ -28,6 +28,17 @@ public interface IProjectService
         Guid currentUserId,
         CancellationToken cancellationToken = default);
 
+
+    Task<ProjectResponseDto?> RequestCompletionAsync(
+        Guid projectId,
+        Guid currentUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<ProjectResponseDto?> ApproveCompletionAsync(
+        Guid projectId,
+        Guid currentUserId,
+        CancellationToken cancellationToken = default);
+
     Task<ProjectSummaryDto?> GetSummaryAsync(
         Guid projectId,
         Guid currentUserId,

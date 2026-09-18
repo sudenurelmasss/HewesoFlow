@@ -6,5 +6,6 @@ public enum ProjectStatus
     Active = 2,
     OnHold = 3,
     Completed = 4,
-    Cancelled = 5
+    Cancelled = 5,
+    PendingApproval = 6
 }

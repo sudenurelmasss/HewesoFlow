@@ -1,214 +1,578 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getDashboardSummary } from "@/services/dashboardService";
+import {
+  ReactNode,
+  useEffect,
+  useState,
+} from "react";
 
-export default function DashboardPage() {
-  const [summary, setSummary] = useState({
-    totalProjects: 0,
-    activeProjects: 0,
-    completedProjects: 0,
-    totalTasks: 0,
-    activeTasks: 0,
-    completedTasks: 0,
-    totalUsers: 0,
-  });
+import {
+  CheckCircle2,
+  ClipboardList,
+  FolderKanban,
+  ListTodo,
+} from "lucide-react";
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+import AdminDashboard
+  from "@/components/dashboard/AdminDashboard";
 
-  async function loadDashboard() {
-    try {
-      setLoading(true);
-      setError("");
+import ProjectManagerDashboard
+  from "@/components/dashboard/ProjectManagerDashboard";
 
-      const result = await getDashboardSummary();
+import {
+  useCurrentUser,
+} from "@/hooks/useCurrentUser";
 
-      setSummary({
-        totalProjects: result.totalProjects ?? 0,
-        activeProjects: result.activeProjects ?? 0,
-        completedProjects: result.completedProjects ?? 0,
-        totalTasks: result.totalTasks ?? 0,
-        activeTasks: result.activeTasks ?? 0,
-        completedTasks: result.completedTasks ?? 0,
-        totalUsers: result.totalUsers ?? 0,
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
+import {
+  DashboardSummary,
+  getDashboardSummary,
+} from "@/services/dashboardService";
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
+import {
+  Department,
+  getDepartments,
+} from "@/services/departmentService";
 
+import {
+  getProjects,
+  Project,
+} from "@/services/projectService";
+
+/* =========================================================
+   EMPTY SUMMARY
+   ========================================================= */
+
+const emptySummary: DashboardSummary = {
+  totalProjects: 0,
+
+  activeProjects: 0,
+
+  completedProjects: 0,
+
+  totalTasks: 0,
+
+  todoTasks: 0,
+
+  inProgressTasks: 0,
+
+  inReviewTasks: 0,
+
+  completedTasks: 0,
+
+  overdueTasks: 0,
+
+  assignedToMeTasks: 0,
+
+  completionPercentage: 0,
+};
+
+/* =========================================================
+   TEAM MEMBER CARD
+   ========================================================= */
+
+type StatCardProps = {
+  label: string;
+  value: number;
+  icon: ReactNode;
+};
+
+function StatCard({
+  label,
+  value,
+  icon,
+}: StatCardProps) {
   return (
-    <main className="min-h-screen bg-[#f6f7fb] px-6 py-8 text-[#17181c]">
-      <div className="mx-auto max-w-7xl">
+    <div
+      className="
+        min-h-[104px]
+        rounded-[20px]
+        border
+        border-gray-200
+        bg-white
+        px-5
+        py-4
+        shadow-sm
 
-        <div className="mb-8">
-          <p className="mb-2 text-sm font-medium text-gray-500">
-            HewesoFlow
+        dark:border-slate-800
+        dark:bg-[#081321]
+      "
+    >
+      <div className="flex h-full items-center justify-between gap-4">
+        <div>
+          <p
+            className="
+              text-[10px]
+              font-bold
+              uppercase
+              tracking-[0.17em]
+              text-gray-400
+
+              dark:text-slate-500
+            "
+          >
+            {label}
           </p>
 
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Dashboard
-          </h1>
+          <p
+            className="
+              mt-2
+              text-[29px]
+              font-bold
+              leading-none
+              tracking-[-0.04em]
+              text-gray-900
 
-          <p className="mt-2 text-sm text-gray-500">
-            Proje ve görev çalışmalarınızın genel görünümü.
+              dark:text-white
+            "
+          >
+            {value}
           </p>
         </div>
 
-        {loading && (
-          <div className="rounded-3xl border border-gray-200 bg-white p-16 text-center">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-black" />
+        <div
+          className="
+            flex
+            h-10
+            w-10
+            items-center
+            justify-center
+            rounded-[13px]
+            border
+            border-gray-100
+            bg-gray-50
+            text-gray-700
 
-            <p className="text-sm text-gray-500">
+            dark:border-slate-700
+            dark:bg-[#0d1a2b]
+            dark:text-slate-200
+          "
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   PAGE
+   ========================================================= */
+
+export default function DashboardPage() {
+  const {
+    user,
+
+    loading:
+      userLoading,
+
+    isAdmin,
+
+    isProjectManager,
+  } =
+    useCurrentUser();
+
+  const [
+    summary,
+    setSummary,
+  ] =
+    useState<DashboardSummary>(
+      emptySummary
+    );
+
+  const [
+    departments,
+    setDepartments,
+  ] =
+    useState<Department[]>(
+      []
+    );
+
+  const [
+    projects,
+    setProjects,
+  ] =
+    useState<Project[]>(
+      []
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(
+      true
+    );
+
+  const [
+    error,
+    setError,
+  ] =
+    useState(
+      ""
+    );
+
+  /* =======================================================
+     LOAD
+     ======================================================= */
+
+  async function loadDashboard() {
+    try {
+      setLoading(
+        true
+      );
+
+      setError(
+        ""
+      );
+
+      /*
+       * Dashboard sayıları.
+       */
+      const dashboardResult =
+        await getDashboardSummary();
+
+      setSummary(
+        dashboardResult
+      );
+
+      /*
+       * Departman + proje listesi
+       * yalnızca Admin dashboard
+       * için gerekli.
+       */
+      if (isAdmin) {
+        const [
+          departmentResult,
+          projectResult,
+        ] =
+          await Promise.all([
+            getDepartments(),
+            getProjects(),
+          ]);
+
+        setDepartments(
+          departmentResult
+        );
+
+        setProjects(
+          projectResult
+        );
+      }
+    } catch (
+      err
+    ) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Dashboard yüklenemedi."
+      );
+    } finally {
+      setLoading(
+        false
+      );
+    }
+  }
+
+  /* =======================================================
+     EFFECT
+     ======================================================= */
+
+  useEffect(
+    () => {
+      if (
+        !userLoading
+      ) {
+        loadDashboard();
+      }
+    },
+    [
+      userLoading,
+      isAdmin,
+    ]
+  );
+
+  /* =======================================================
+     LOADING
+     ======================================================= */
+
+  if (
+    loading ||
+    userLoading
+  ) {
+    return (
+      <main className="min-h-screen px-6 py-10">
+        <div className="mx-auto max-w-[1180px]">
+          <div
+            className="
+              rounded-[22px]
+              border
+              border-gray-200
+              bg-white
+              p-14
+              text-center
+
+              dark:border-slate-800
+              dark:bg-[#081321]
+            "
+          >
+            <div
+              className="
+                mx-auto
+                h-8
+                w-8
+                animate-spin
+                rounded-full
+                border-2
+                border-gray-200
+                border-t-gray-900
+
+                dark:border-slate-700
+                dark:border-t-blue-400
+              "
+            />
+
+            <p
+              className="
+                mt-4
+                text-sm
+                font-medium
+                text-gray-500
+
+                dark:text-slate-400
+              "
+            >
               Dashboard yükleniyor...
             </p>
           </div>
-        )}
+        </div>
+      </main>
+    );
+  }
 
-        {!loading && error && (
-          <div className="rounded-3xl border border-red-200 bg-white p-8">
-            <p className="font-medium text-red-600">
+  /* =======================================================
+     ERROR
+     ======================================================= */
+
+  if (error) {
+    return (
+      <main className="min-h-screen px-6 py-10">
+        <div className="mx-auto max-w-[1180px]">
+          <div
+            className="
+              rounded-[22px]
+              border
+              border-red-200
+              bg-white
+              p-8
+
+              dark:border-red-500/30
+              dark:bg-[#081321]
+            "
+          >
+            <p
+              className="
+                font-bold
+                text-red-600
+
+                dark:text-red-300
+              "
+            >
               Dashboard yüklenemedi
             </p>
 
-            <p className="mt-2 text-sm text-gray-500">
+            <p
+              className="
+                mt-2
+                text-sm
+                text-gray-500
+
+                dark:text-slate-400
+              "
+            >
               {error}
             </p>
 
             <button
-              onClick={loadDashboard}
-              className="mt-5 rounded-2xl bg-black px-5 py-3 text-sm text-white"
+              type="button"
+              onClick={
+                loadDashboard
+              }
+              className="
+                mt-5
+                rounded-xl
+                bg-black
+                px-5
+                py-3
+                text-sm
+                font-semibold
+                text-white
+
+                dark:bg-white
+                dark:text-black
+              "
             >
               Tekrar Dene
             </button>
           </div>
-        )}
+        </div>
+      </main>
+    );
+  }
 
-        {!loading && !error && (
-          <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+  /* =======================================================
+     USER NAME
+     ======================================================= */
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-6">
-                <p className="text-xs uppercase tracking-wider text-gray-400">
-                  Toplam Proje
-                </p>
+  const displayName =
+    `${
+      user?.firstName ??
+      ""
+    } ${
+      user?.lastName ??
+      ""
+    }`.trim();
 
-                <p className="mt-3 text-3xl font-semibold">
-                  {summary.totalProjects}
-                </p>
-              </div>
+  /* =======================================================
+     ADMIN
+     ======================================================= */
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-6">
-                <p className="text-xs uppercase tracking-wider text-gray-400">
-                  Aktif Proje
-                </p>
+  if (
+    isAdmin
+  ) {
+    return (
+      <AdminDashboard
+        summary={
+          summary
+        }
+        departments={
+          departments
+        }
+        projects={
+          projects
+        }
+        displayName={
+          displayName
+        }
+      />
+    );
+  }
 
-                <p className="mt-3 text-3xl font-semibold">
-                  {summary.activeProjects}
-                </p>
-              </div>
+  /* =======================================================
+     PROJECT MANAGER
+     ======================================================= */
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-6">
-                <p className="text-xs uppercase tracking-wider text-gray-400">
-                  Toplam Görev
-                </p>
+  if (
+    isProjectManager
+  ) {
+    return (
+      <ProjectManagerDashboard
+        summary={
+          summary
+        }
+        displayName={
+          displayName
+        }
+      />
+    );
+  }
 
-                <p className="mt-3 text-3xl font-semibold">
-                  {summary.totalTasks}
-                </p>
-              </div>
+  /* =======================================================
+     TEAM MEMBER
+     ======================================================= */
 
-              <div className="rounded-3xl border border-gray-200 bg-black p-6 text-white">
-                <p className="text-xs uppercase tracking-wider text-gray-400">
-                  Tamamlanan Görev
-                </p>
+  return (
+    <main className="min-h-screen px-6 py-8">
+      <div className="mx-auto max-w-[1180px]">
+        <div className="mb-6">
+          <h1
+            className="
+              text-[31px]
+              font-bold
+              tracking-[-0.045em]
+              text-gray-900
 
-                <p className="mt-3 text-3xl font-semibold">
-                  {summary.completedTasks}
-                </p>
-              </div>
+              dark:text-white
+            "
+          >
+            Dashboard
+          </h1>
 
-            </div>
+          <p
+            className="
+              mt-1.5
+              text-[13px]
+              font-medium
+              text-gray-500
 
-            <div className="mt-6 grid gap-6 lg:grid-cols-3">
+              dark:text-slate-400
+            "
+          >
+            {displayName
+              ? `Hoş geldiniz, ${displayName}. Proje ve görev durumunuzu takip edin.`
+              : "Proje ve görev durumunuzu takip edin."}
+          </p>
+        </div>
 
-              <section className="rounded-3xl border border-gray-200 bg-white p-6 lg:col-span-2">
-                <h2 className="text-lg font-semibold">
-                  Çalışma Özeti
-                </h2>
+        <div
+          className="
+            grid
+            gap-3
+            sm:grid-cols-2
+            xl:grid-cols-4
+          "
+        >
+          <StatCard
+            label="Projelerim"
+            value={
+              summary.totalProjects
+            }
+            icon={
+              <FolderKanban
+                size={18}
+                strokeWidth={1.9}
+              />
+            }
+          />
 
-                <p className="mt-1 text-sm text-gray-500">
-                  Proje ve görev durumlarının genel dağılımı.
-                </p>
+          <StatCard
+            label="Görevler"
+            value={
+              summary.totalTasks
+            }
+            icon={
+              <ClipboardList
+                size={18}
+                strokeWidth={1.9}
+              />
+            }
+          />
 
-                <div className="mt-7 grid gap-4 sm:grid-cols-2">
+          <StatCard
+            label="Devam Eden Görev"
+            value={
+              summary.inProgressTasks
+            }
+            icon={
+              <ListTodo
+                size={18}
+                strokeWidth={1.9}
+              />
+            }
+          />
 
-                  <div className="rounded-2xl bg-gray-50 p-5">
-                    <p className="text-sm text-gray-500">
-                      Aktif Görev
-                    </p>
-
-                    <p className="mt-2 text-2xl font-semibold">
-                      {summary.activeTasks}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-gray-50 p-5">
-                    <p className="text-sm text-gray-500">
-                      Tamamlanan Proje
-                    </p>
-
-                    <p className="mt-2 text-2xl font-semibold">
-                      {summary.completedProjects}
-                    </p>
-                  </div>
-
-                </div>
-              </section>
-
-              <section className="rounded-3xl border border-gray-200 bg-white p-6">
-                <h2 className="text-lg font-semibold">
-                  Hızlı Erişim
-                </h2>
-
-                <div className="mt-6 space-y-3">
-
-                  <a
-                    href="/projects"
-                    className="block rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium hover:bg-gray-50"
-                  >
-                    Projeler
-                  </a>
-
-                  <a
-                    href="/my-tasks"
-                    className="block rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium hover:bg-gray-50"
-                  >
-                    Görevlerim
-                  </a>
-
-                  <a
-                    href="/notifications"
-                    className="block rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium hover:bg-gray-50"
-                  >
-                    Bildirimler
-                  </a>
-
-                </div>
-              </section>
-
-            </div>
-          </>
-        )}
+          <StatCard
+            label="Tamamlanan Görev"
+            value={
+              summary.completedTasks
+            }
+            icon={
+              <CheckCircle2
+                size={18}
+                strokeWidth={1.9}
+              />
+            }
+          />
+        </div>
       </div>
     </main>
   );

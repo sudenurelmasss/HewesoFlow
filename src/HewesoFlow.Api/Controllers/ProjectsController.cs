@@ -251,6 +251,42 @@ public class ProjectController : ControllerBase
         }
     }
 
+    [HttpPost("{id:guid}/request-completion")]
+    [Authorize(Roles = "ProjectManager")]
+    public async Task<IActionResult> RequestCompletion(Guid id, CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var currentUserId)) return Unauthorized();
+        try
+        {
+            var project = await _projectService.RequestCompletionAsync(id, currentUserId, cancellationToken);
+            return project is null ? NotFound(new { message = "Proje bulunamadı." }) : Ok(project);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        {
+            return ex is UnauthorizedAccessException
+                ? StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message })
+                : BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{id:guid}/approve-completion")]
+    [Authorize(Roles = "ProjectManager")]
+    public async Task<IActionResult> ApproveCompletion(Guid id, CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var currentUserId)) return Unauthorized();
+        try
+        {
+            var project = await _projectService.ApproveCompletionAsync(id, currentUserId, cancellationToken);
+            return project is null ? NotFound(new { message = "Proje bulunamadı." }) : Ok(project);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        {
+            return ex is UnauthorizedAccessException
+                ? StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message })
+                : BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("{projectId:guid}/summary")]
     public async Task<IActionResult> GetSummary(
         Guid projectId,

@@ -178,6 +178,19 @@ public class NotificationCommentService : ICommentService
                 !mentionedUserIds.Contains(
                     task.AssignedUserId.Value))
             {
+                var isDelayNotification =
+                    content.TrimStart().StartsWith(
+                        "Gecikme bildirimi:",
+                        StringComparison.OrdinalIgnoreCase);
+
+                var notificationMessage =
+                    isDelayNotification
+                        ? content.Trim()
+                            .Substring(
+                                "Gecikme bildirimi:".Length)
+                            .Trim()
+                        : $"{commenterName}, \"{task.Title}\" görevine yeni bir yorum ekledi.";
+
                 await CreateNotificationSafeAsync(
                     new CreateNotificationRequestDto
                     {
@@ -185,10 +198,14 @@ public class NotificationCommentService : ICommentService
                             task.AssignedUserId.Value,
 
                         Title =
-                            "Görevinize yeni yorum eklendi",
+                            isDelayNotification
+                                ? "Geciken görev bildirimi"
+                                : "Görevinize yeni yorum eklendi",
 
                         Message =
-                            $"{commenterName}, \"{task.Title}\" görevine yeni bir yorum ekledi.",
+                            isDelayNotification
+                                ? $"{task.Title}: {notificationMessage}"
+                                : notificationMessage,
 
                         Type =
                             NotificationType.CommentAdded,

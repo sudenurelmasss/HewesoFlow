@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using HewesoFlow.Application.Abstractions.TaskAttachments;
+using HewesoFlow.Application.Abstractions.Comments;
+using HewesoFlow.Application.Features.Comments.DTOs;
 using HewesoFlow.Application.Features.TaskAttachments.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,11 +14,14 @@ namespace HewesoFlow.Api.Controllers;
 public class TaskAttachmentsController : ControllerBase
 {
     private readonly ITaskAttachmentService _service;
+    private readonly ICommentService _commentService;
 
     public TaskAttachmentsController(
-        ITaskAttachmentService service)
+        ITaskAttachmentService service,
+        ICommentService commentService)
     {
         _service = service;
+        _commentService = commentService;
     }
 
     [HttpPost]
@@ -25,6 +30,7 @@ public class TaskAttachmentsController : ControllerBase
     public async Task<IActionResult> Upload(
         Guid taskId,
         IFormFile file,
+        [FromForm] string description,
         CancellationToken cancellationToken)
     {
         if (!TryGetCurrentUserId(
@@ -39,6 +45,24 @@ public class TaskAttachmentsController : ControllerBase
             {
                 message =
                     "Dosya seçilmedi."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Dosya açıklaması zorunludur."
+            });
+        }
+
+        if (description.Trim().Length > 500)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Dosya açıklaması en fazla 500 karakter olabilir."
             });
         }
 
@@ -69,6 +93,16 @@ public class TaskAttachmentsController : ControllerBase
                     request,
                     currentUserId,
                     cancellationToken);
+
+            await _commentService.CreateAsync(
+                taskId,
+                new CreateCommentRequestDto
+                {
+                    Content =
+                        $"[DOSYA:{result.OriginalFileName}] {description.Trim()}"
+                },
+                currentUserId,
+                cancellationToken);
 
             return Ok(result);
         }

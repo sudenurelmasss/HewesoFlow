@@ -16,5 +16,11 @@ public enum NotificationType
 
     ProjectUpdated = 6,
 
-    ProjectMemberAdded = 7
+    ProjectMemberAdded = 7,
+
+    ProjectMessage = 8,
+
+    PrivateMessage = 9,
+
+    MeetingAdded = 10
 }

@@ -1,21 +1,51 @@
-import { getStoredToken } from "./authService";
+import {
+  getStoredToken,
+} from "./authService";
 
 export interface Project {
   id: string;
+
   name: string;
+
   description?: string | null;
+
+  departmentId: string;
+  departmentName?: string | null;
+
+  projectManagerId: string;
+  projectManagerName?: string | null;
+
   status?: string | number;
+
   startDate?: string | null;
   endDate?: string | null;
+
   createdAt?: string | null;
   updatedAt?: string | null;
+
+  requiresMemberApproval?: boolean;
+
+  completionRequestedAt?: string | null;
+  completionApprovedAt?: string | null;
+  completionApprovedByUserId?: string | null;
+
+  ownerId?: string | null;
 }
 
 export interface CreateProjectRequest {
   name: string;
-  description?: string;
+
+  description: string;
+
+  departmentId: string;
+
+  projectManagerId?: string | null;
+
   startDate?: string | null;
+
   endDate?: string | null;
+
+  requiresMemberApproval?: boolean;
 }
 
 interface ApiResponse<T> {
@@ -25,121 +55,315 @@ interface ApiResponse<T> {
 }
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5063";
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5063";
 
-const PROJECT_ENDPOINT = `${API_URL}/api/Project`;
+const PROJECT_ENDPOINT =
+  `${API_URL}/api/Project`;
 
-function getHeaders() {
-  const token = getStoredToken();
+function getHeaders(): HeadersInit {
+  const token =
+    getStoredToken();
 
   if (!token) {
-    throw new Error("Oturum bulunamadı.");
+    throw new Error(
+      "Oturum bulunamadı."
+    );
   }
 
   return {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-    Authorization: `Bearer ${token}`,
+    "Content-Type":
+      "application/json",
+
+    Accept:
+      "application/json",
+
+    Authorization:
+      `Bearer ${token}`,
   };
 }
 
-async function handleError(response: Response) {
-  let message = `İstek başarısız oldu. Hata kodu: ${response.status}`;
+async function handleError(
+  response: Response
+): Promise<never> {
+  let message =
+    `İstek başarısız oldu. Hata kodu: ${response.status}`;
 
   try {
-    const result = await response.json();
+    const result =
+      await response.json();
 
-    if (result?.message) {
-      message = result.message;
-    }
+    message =
+      result?.message ||
+      result?.title ||
+      message;
   } catch {}
 
-  throw new Error(message);
+  throw new Error(
+    message
+  );
 }
 
-export async function getProjects(): Promise<Project[]> {
-  const response = await fetch(PROJECT_ENDPOINT, {
-    method: "GET",
-    headers: getHeaders(),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    await handleError(response);
+function unwrapProject(
+  result:
+    | Project
+    | ApiResponse<Project>
+): Project {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    "data" in result &&
+    result.data
+  ) {
+    return result.data;
   }
 
-  const result: Project[] | ApiResponse<Project[]> =
-    await response.json();
+  return result as Project;
+}
 
+function unwrapList(
+  result:
+    | Project[]
+    | ApiResponse<Project[]>
+): Project[] {
   if (Array.isArray(result)) {
     return result;
   }
 
-  if (Array.isArray(result.data)) {
+  if (
+    result &&
+    Array.isArray(result.data)
+  ) {
     return result.data;
   }
 
   return [];
 }
 
+export async function getProjects():
+  Promise<Project[]> {
+  const response =
+    await fetch(
+      PROJECT_ENDPOINT,
+      {
+        method:
+          "GET",
+
+        headers:
+          getHeaders(),
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (!response.ok) {
+    return handleError(
+      response
+    );
+  }
+
+  const result =
+    await response.json();
+
+  return unwrapList(
+    result
+  );
+}
+
 export async function getProjectById(
   id: string
 ): Promise<Project | null> {
-  const response = await fetch(
-    `${PROJECT_ENDPOINT}/${id}`,
-    {
-      method: "GET",
-      headers: getHeaders(),
-      cache: "no-store",
-    }
-  );
+  const response =
+    await fetch(
+      `${PROJECT_ENDPOINT}/${id}`,
+      {
+        method:
+          "GET",
 
-  if (response.status === 404) {
+        headers:
+          getHeaders(),
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (
+    response.status ===
+    404
+  ) {
     return null;
   }
 
   if (!response.ok) {
-    await handleError(response);
+    return handleError(
+      response
+    );
   }
 
-  const result: Project | ApiResponse<Project> =
-    await response.json();
-
-  if ("data" in result && result.data) {
-    return result.data;
-  }
-
-  return result as Project;
+  return unwrapProject(
+    await response.json()
+  );
 }
 
 export async function createProject(
   request: CreateProjectRequest
-): Promise<Project | null> {
-  const response = await fetch(PROJECT_ENDPOINT, {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({
-      name: request.name,
-      description: request.description || null,
-      startDate: request.startDate || null,
-      endDate: request.endDate || null,
-    }),
-  });
+): Promise<Project> {
+  const name =
+    request.name.trim();
+
+  const description =
+    request.description.trim();
+
+  if (!name) {
+    throw new Error(
+      "Proje adı zorunludur."
+    );
+  }
+
+  if (!description) {
+    throw new Error(
+      "Proje açıklaması zorunludur."
+    );
+  }
+
+  if (!request.departmentId) {
+    throw new Error(
+      "Departman seçilmelidir."
+    );
+  }
+
+  if (
+    request.startDate &&
+    request.endDate &&
+    request.endDate <
+      request.startDate
+  ) {
+    throw new Error(
+      "Bitiş tarihi başlangıç tarihinden önce olamaz."
+    );
+  }
+
+  const response =
+    await fetch(
+      PROJECT_ENDPOINT,
+      {
+        method:
+          "POST",
+
+        headers:
+          getHeaders(),
+
+        body:
+          JSON.stringify({
+            name,
+
+            description,
+
+            departmentId:
+              request.departmentId,
+
+            projectManagerId:
+              request.projectManagerId ||
+              null,
+
+            startDate:
+              request.startDate ||
+              null,
+
+            endDate:
+              request.endDate ||
+              null,
+
+            requiresMemberApproval:
+              request.requiresMemberApproval ??
+              false,
+          }),
+      }
+    );
 
   if (!response.ok) {
-    await handleError(response);
+    return handleError(
+      response
+    );
   }
 
-  if (response.status === 204) {
-    return null;
+  return unwrapProject(
+    await response.json()
+  );
+}
+
+export async function requestProjectCompletion(
+  id: string
+): Promise<Project> {
+  const response =
+    await fetch(
+      `${PROJECT_ENDPOINT}/${id}/request-completion`,
+      {
+        method:
+          "POST",
+
+        headers:
+          getHeaders(),
+      }
+    );
+
+  if (!response.ok) {
+    return handleError(
+      response
+    );
   }
 
-  const result: Project | ApiResponse<Project> =
-    await response.json();
+  return unwrapProject(
+    await response.json()
+  );
+}
 
-  if ("data" in result && result.data) {
-    return result.data;
+export async function approveProjectCompletion(
+  id: string
+): Promise<Project> {
+  const response =
+    await fetch(
+      `${PROJECT_ENDPOINT}/${id}/approve-completion`,
+      {
+        method:
+          "POST",
+
+        headers:
+          getHeaders(),
+      }
+    );
+
+  if (!response.ok) {
+    return handleError(
+      response
+    );
   }
 
-  return result as Project;
+  return unwrapProject(
+    await response.json()
+  );
+}
+
+export async function deleteProject(
+  id: string
+): Promise<void> {
+  const response =
+    await fetch(
+      `${PROJECT_ENDPOINT}/${id}`,
+      {
+        method:
+          "DELETE",
+
+        headers:
+          getHeaders(),
+      }
+    );
+
+  if (!response.ok) {
+    return handleError(
+      response
+    );
+  }
 }

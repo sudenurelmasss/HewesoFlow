@@ -30,7 +30,8 @@ namespace HewesoFlow.Persistence.Migrations
 
                     b.Property<string>("Content")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -39,6 +40,9 @@ namespace HewesoFlow.Persistence.Migrations
                         .HasColumnType("bit");
 
                     b.Property<Guid>("ProjectTaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RecipientUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -50,6 +54,8 @@ namespace HewesoFlow.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProjectTaskId");
+
+                    b.HasIndex("RecipientUserId");
 
                     b.HasIndex("UserId");
 
@@ -94,6 +100,100 @@ namespace HewesoFlow.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Departments");
+                });
+
+            modelBuilder.Entity("HewesoFlow.Domain.Entities.Meeting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AudienceLabel")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("EndDateTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RoomName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ScopeType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartDateTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("RoomName")
+                        .IsUnique();
+
+                    b.HasIndex("StartDateTime");
+
+                    b.ToTable("Meetings");
+                });
+
+            modelBuilder.Entity("HewesoFlow.Domain.Entities.MeetingParticipant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("MeetingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("MeetingId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("MeetingParticipants");
                 });
 
             modelBuilder.Entity("HewesoFlow.Domain.Entities.Notification", b =>
@@ -155,13 +255,23 @@ namespace HewesoFlow.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("CompletionApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CompletionApprovedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CompletionRequestedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("DepartmentId")
+                    b.Property<Guid>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("EndDate")
@@ -178,6 +288,12 @@ namespace HewesoFlow.Persistence.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("ProjectManagerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("RequiresMemberApproval")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
 
@@ -192,6 +308,8 @@ namespace HewesoFlow.Persistence.Migrations
                     b.HasIndex("DepartmentId");
 
                     b.HasIndex("OwnerId");
+
+                    b.HasIndex("ProjectManagerId");
 
                     b.ToTable("Projects");
                 });
@@ -267,6 +385,46 @@ namespace HewesoFlow.Persistence.Migrations
                     b.ToTable("ProjectMembers");
                 });
 
+            modelBuilder.Entity("HewesoFlow.Domain.Entities.ProjectMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(3000)
+                        .HasColumnType("nvarchar(3000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RecipientUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SenderUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("RecipientUserId");
+
+                    b.HasIndex("SenderUserId");
+
+                    b.ToTable("ProjectMessages");
+                });
+
             modelBuilder.Entity("HewesoFlow.Domain.Entities.ProjectTask", b =>
                 {
                     b.Property<Guid>("Id")
@@ -286,14 +444,11 @@ namespace HewesoFlow.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<decimal?>("EstimatedHours")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -584,47 +739,6 @@ namespace HewesoFlow.Persistence.Migrations
                     b.ToTable("TaskHistories");
                 });
 
-            modelBuilder.Entity("HewesoFlow.Domain.Entities.TaskTimeLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<decimal>("Hours")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("ProjectTaskId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("WorkDate")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectTaskId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("TaskTimeLogs");
-                });
-
             modelBuilder.Entity("HewesoFlow.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -728,6 +842,11 @@ namespace HewesoFlow.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HewesoFlow.Domain.Entities.User", "RecipientUser")
+                        .WithMany()
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("HewesoFlow.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -735,6 +854,8 @@ namespace HewesoFlow.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("ProjectTask");
+
+                    b.Navigation("RecipientUser");
 
                     b.Navigation("User");
                 });
@@ -747,6 +868,43 @@ namespace HewesoFlow.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Manager");
+                });
+
+            modelBuilder.Entity("HewesoFlow.Domain.Entities.Meeting", b =>
+                {
+                    b.HasOne("HewesoFlow.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HewesoFlow.Domain.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("HewesoFlow.Domain.Entities.MeetingParticipant", b =>
+                {
+                    b.HasOne("HewesoFlow.Domain.Entities.Meeting", "Meeting")
+                        .WithMany("Participants")
+                        .HasForeignKey("MeetingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HewesoFlow.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Meeting");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("HewesoFlow.Domain.Entities.Notification", b =>
@@ -765,7 +923,8 @@ namespace HewesoFlow.Persistence.Migrations
                     b.HasOne("HewesoFlow.Domain.Entities.Department", "Department")
                         .WithMany("Projects")
                         .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("HewesoFlow.Domain.Entities.User", "Owner")
                         .WithMany()
@@ -773,9 +932,17 @@ namespace HewesoFlow.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HewesoFlow.Domain.Entities.User", "ProjectManager")
+                        .WithMany()
+                        .HasForeignKey("ProjectManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Department");
 
                     b.Navigation("Owner");
+
+                    b.Navigation("ProjectManager");
                 });
 
             modelBuilder.Entity("HewesoFlow.Domain.Entities.ProjectDependency", b =>
@@ -814,6 +981,32 @@ namespace HewesoFlow.Persistence.Migrations
                     b.Navigation("Project");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HewesoFlow.Domain.Entities.ProjectMessage", b =>
+                {
+                    b.HasOne("HewesoFlow.Domain.Entities.Project", "Project")
+                        .WithMany("Messages")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HewesoFlow.Domain.Entities.User", "RecipientUser")
+                        .WithMany()
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HewesoFlow.Domain.Entities.User", "SenderUser")
+                        .WithMany()
+                        .HasForeignKey("SenderUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+
+                    b.Navigation("RecipientUser");
+
+                    b.Navigation("SenderUser");
                 });
 
             modelBuilder.Entity("HewesoFlow.Domain.Entities.ProjectTask", b =>
@@ -936,25 +1129,6 @@ namespace HewesoFlow.Persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("HewesoFlow.Domain.Entities.TaskTimeLog", b =>
-                {
-                    b.HasOne("HewesoFlow.Domain.Entities.ProjectTask", "ProjectTask")
-                        .WithMany("TimeLogs")
-                        .HasForeignKey("ProjectTaskId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("HewesoFlow.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ProjectTask");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("HewesoFlow.Domain.Entities.User", b =>
                 {
                     b.HasOne("HewesoFlow.Domain.Entities.Department", "DepartmentEntity")
@@ -998,9 +1172,16 @@ namespace HewesoFlow.Persistence.Migrations
                     b.Navigation("Users");
                 });
 
+            modelBuilder.Entity("HewesoFlow.Domain.Entities.Meeting", b =>
+                {
+                    b.Navigation("Participants");
+                });
+
             modelBuilder.Entity("HewesoFlow.Domain.Entities.Project", b =>
                 {
                     b.Navigation("Members");
+
+                    b.Navigation("Messages");
 
                     b.Navigation("Tasks");
                 });
@@ -1016,8 +1197,6 @@ namespace HewesoFlow.Persistence.Migrations
                     b.Navigation("TaskHistories");
 
                     b.Navigation("TaskTags");
-
-                    b.Navigation("TimeLogs");
                 });
 
             modelBuilder.Entity("HewesoFlow.Domain.Entities.Role", b =>

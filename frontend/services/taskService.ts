@@ -10,7 +10,6 @@ export interface TaskItem {
   priority?: string | number;
 
   dueDate?: string | null;
-  estimatedHours?: number | null;
 
   completedAt?: string | null;
 
@@ -43,7 +42,6 @@ export interface CreateTaskRequest {
   priority: number;
 
   dueDate?: string | null;
-  estimatedHours?: number | null;
 }
 
 interface ApiResponse<T> {
@@ -309,9 +307,6 @@ export async function createTask(
     dueDate:
       request.dueDate || null,
 
-    estimatedHours:
-      request.estimatedHours ??
-      null,
   };
 
   const endpoints = [
@@ -509,4 +504,13 @@ export async function updateTaskStatus(
   throw new Error(
     "Görev durumu endpointi bulunamadı."
   );
+}
+export async function getCalendarTasks(): Promise<TaskItem[]> {
+  const response = await fetch(`${API_URL}/api/Tasks?page=1&pageSize=100`, {
+    method: "GET",
+    headers: getHeaders(),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(await getMessage(response));
+  return unwrapTaskList(await response.json());
 }

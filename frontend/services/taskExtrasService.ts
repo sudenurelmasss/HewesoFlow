@@ -1,358 +1,520 @@
-import { getStoredToken } from "./authService";
+import {
+  getStoredToken,
+} from "./authService";
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5063";
 
 export interface CommentItem {
   id: string;
-  content?: string | null;
-  text?: string | null;
 
-  userId?: string | null;
-  userName?: string | null;
-  createdByName?: string | null;
+  content: string;
 
-  createdAt?: string | null;
+  projectTaskId?: string;
+  projectTaskTitle?: string;
+
+  userId: string;
+  userFullName: string;
+
+  recipientUserId?: string | null;
+  recipientUserFullName?: string | null;
+
+  isPrivate?: boolean;
+
+  createdAt: string;
+  updatedAt?: string | null;
 }
 
-export interface TaskHistoryItem {
+export interface ChecklistItem {
   id: string;
 
-  action?: string | null;
-  description?: string | null;
+  projectTaskId: string;
 
-  oldValue?: string | null;
-  newValue?: string | null;
+  title: string;
 
-  userName?: string | null;
-  createdAt?: string | null;
+  isCompleted: boolean;
+
+  sortOrder: number;
+
+  completedAt?: string | null;
 }
 
-export interface TimeLogItem {
+export interface AttachmentItem {
   id: string;
 
-  minutes?: number;
-  durationMinutes?: number;
+  projectTaskId: string;
 
-  description?: string | null;
+  uploadedByUserId: string;
+  uploadedByUserName: string;
 
-  userName?: string | null;
-  createdAt?: string | null;
+  originalFileName: string;
+
+  contentType: string;
+
+  fileSize: number;
+
+  createdAt: string;
 }
 
-interface ApiResponse<T> {
-  isSuccess?: boolean;
-  message?: string;
-  data?: T;
-}
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5063";
-
-function getHeaders(contentType = false) {
-  const token = getStoredToken();
+function headers(
+  json = false
+): HeadersInit {
+  const token =
+    getStoredToken();
 
   if (!token) {
-    throw new Error("Oturum bulunamadı.");
+    throw new Error(
+      "Oturum bulunamadı."
+    );
   }
 
   return {
-    ...(contentType
+    Accept:
+      "application/json",
+
+    Authorization:
+      `Bearer ${token}`,
+
+    ...(json
       ? {
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
         }
       : {}),
-    Accept: "application/json",
-    Authorization: `Bearer ${token}`,
   };
 }
 
-function unwrapList<T>(
-  result: T[] | ApiResponse<T[]>
-): T[] {
-  if (Array.isArray(result)) {
-    return result;
-  }
-
-  if (Array.isArray(result.data)) {
-    return result.data;
-  }
-
-  return [];
-}
-
-async function getErrorMessage(
+async function fail(
   response: Response
-): Promise<string> {
-  try {
-    const result = await response.json();
+): Promise<never> {
+  let message =
+    `İstek başarısız (${response.status}).`;
 
-    return (
+  try {
+    const result =
+      await response.json();
+
+    message =
       result?.message ||
       result?.title ||
-      `İstek başarısız oldu. Hata kodu: ${response.status}`
-    );
-  } catch {
-    return `İstek başarısız oldu. Hata kodu: ${response.status}`;
-  }
-}
+      message;
+  } catch {}
 
-/* =========================
-   COMMENTS
-========================= */
+  throw new Error(
+    message
+  );
+}
 
 export async function getTaskComments(
   taskId: string
 ): Promise<CommentItem[]> {
-  const endpoints = [
-    `${API_URL}/api/Comments/task/${taskId}`,
-    `${API_URL}/api/Comment/task/${taskId}`,
-    `${API_URL}/api/Tasks/${taskId}/comments`,
-    `${API_URL}/api/Task/${taskId}/comments`,
-  ];
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/comments`,
+      {
+        headers:
+          headers(),
 
-  for (const endpoint of endpoints) {
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: getHeaders(),
-      cache: "no-store",
-    });
+        cache:
+          "no-store",
+      }
+    );
 
-    if (response.status === 404) {
-      continue;
-    }
-
-    if (response.status === 401) {
-      throw new Error(
-        "Oturum süresi dolmuş olabilir."
-      );
-    }
-
-    if (response.status === 403) {
-      throw new Error(
-        "Yorumları görüntülemek için yetkiniz bulunmuyor."
-      );
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        await getErrorMessage(response)
-      );
-    }
-
-    const result:
-      | CommentItem[]
-      | ApiResponse<CommentItem[]> =
-      await response.json();
-
-    return unwrapList(result);
+  if (!response.ok) {
+    return fail(
+      response
+    );
   }
 
-  return [];
+  return response.json();
 }
 
 export async function addTaskComment(
   taskId: string,
+  content: string,
+  recipientUserId?: string | null
+): Promise<CommentItem> {
+  const value =
+    content.trim();
+
+  if (!value) {
+    throw new Error(
+      "Yorum boş bırakılamaz."
+    );
+  }
+
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/comments`,
+      {
+        method: "POST",
+
+        headers:
+          headers(true),
+
+        body:
+          JSON.stringify({
+            content:
+              value,
+
+            recipientUserId:
+              recipientUserId ||
+              null,
+          }),
+      }
+    );
+
+  if (!response.ok) {
+    return fail(
+      response
+    );
+  }
+
+  return response.json();
+}
+
+export async function updateComment(
+  commentId: string,
   content: string
+): Promise<CommentItem> {
+  const response =
+    await fetch(
+      `${API_URL}/api/comments/${commentId}`,
+      {
+        method: "PUT",
+
+        headers:
+          headers(true),
+
+        body:
+          JSON.stringify({
+            content:
+              content.trim(),
+          }),
+      }
+    );
+
+  if (!response.ok) {
+    return fail(
+      response
+    );
+  }
+
+  return response.json();
+}
+
+export async function deleteComment(
+  commentId: string
 ): Promise<void> {
-  const endpoints = [
-    `${API_URL}/api/Comments`,
-    `${API_URL}/api/Comment`,
-    `${API_URL}/api/Tasks/${taskId}/comments`,
-  ];
+  const response =
+    await fetch(
+      `${API_URL}/api/comments/${commentId}`,
+      {
+        method: "DELETE",
 
-  for (const endpoint of endpoints) {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: getHeaders(true),
+        headers:
+          headers(),
+      }
+    );
 
-      body: JSON.stringify({
-        taskId,
-        content,
-      }),
-    });
-
-    if (response.status === 404) {
-      continue;
-    }
-
-    if (response.status === 401) {
-      throw new Error(
-        "Oturum süresi dolmuş olabilir."
-      );
-    }
-
-    if (response.status === 403) {
-      throw new Error(
-        "Yorum eklemek için yetkiniz bulunmuyor."
-      );
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        await getErrorMessage(response)
-      );
-    }
-
-    return;
+  if (!response.ok) {
+    return fail(
+      response
+    );
   }
-
-  throw new Error(
-    "Comments endpointi bulunamadı."
-  );
 }
 
-/* =========================
-   TASK HISTORY
-========================= */
-
-export async function getTaskHistory(
+export async function getChecklist(
   taskId: string
-): Promise<TaskHistoryItem[]> {
-  const endpoints = [
-    `${API_URL}/api/TaskHistory/task/${taskId}`,
-    `${API_URL}/api/TaskHistories/task/${taskId}`,
-    `${API_URL}/api/Tasks/${taskId}/history`,
-    `${API_URL}/api/Task/${taskId}/history`,
-  ];
+): Promise<ChecklistItem[]> {
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/checklist`,
+      {
+        headers:
+          headers(),
 
-  for (const endpoint of endpoints) {
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: getHeaders(),
-      cache: "no-store",
-    });
+        cache:
+          "no-store",
+      }
+    );
 
-    if (response.status === 404) {
-      continue;
-    }
-
-    if (response.status === 401) {
-      throw new Error(
-        "Oturum süresi dolmuş olabilir."
-      );
-    }
-
-    if (response.status === 403) {
-      return [];
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        await getErrorMessage(response)
-      );
-    }
-
-    const result:
-      | TaskHistoryItem[]
-      | ApiResponse<TaskHistoryItem[]> =
-      await response.json();
-
-    return unwrapList(result);
+  if (!response.ok) {
+    return fail(
+      response
+    );
   }
 
-  return [];
+  return response.json();
 }
 
-/* =========================
-   TIME LOG
-========================= */
-
-export async function getTaskTimeLogs(
-  taskId: string
-): Promise<TimeLogItem[]> {
-  const endpoints = [
-    `${API_URL}/api/TaskTimeLogs/task/${taskId}`,
-    `${API_URL}/api/TimeLogs/task/${taskId}`,
-    `${API_URL}/api/Tasks/${taskId}/time-logs`,
-    `${API_URL}/api/Task/${taskId}/time-logs`,
-  ];
-
-  for (const endpoint of endpoints) {
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: getHeaders(),
-      cache: "no-store",
-    });
-
-    if (response.status === 404) {
-      continue;
-    }
-
-    if (response.status === 401) {
-      throw new Error(
-        "Oturum süresi dolmuş olabilir."
-      );
-    }
-
-    if (response.status === 403) {
-      return [];
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        await getErrorMessage(response)
-      );
-    }
-
-    const result:
-      | TimeLogItem[]
-      | ApiResponse<TimeLogItem[]> =
-      await response.json();
-
-    return unwrapList(result);
-  }
-
-  return [];
-}
-
-export async function addTaskTimeLog(
+export async function addChecklistItem(
   taskId: string,
-  minutes: number,
-  description: string
-): Promise<void> {
-  const endpoints = [
-    `${API_URL}/api/TaskTimeLogs`,
-    `${API_URL}/api/TimeLogs`,
-    `${API_URL}/api/Tasks/${taskId}/time-logs`,
-  ];
+  title: string,
+  sortOrder = 0
+): Promise<ChecklistItem> {
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/checklist`,
+      {
+        method: "POST",
 
-  for (const endpoint of endpoints) {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: getHeaders(true),
+        headers:
+          headers(true),
 
-      body: JSON.stringify({
-        taskId,
-        minutes,
-        durationMinutes: minutes,
-        description,
-      }),
-    });
+        body:
+          JSON.stringify({
+            title:
+              title.trim(),
 
-    if (response.status === 404) {
-      continue;
-    }
+            sortOrder,
+          }),
+      }
+    );
 
-    if (response.status === 401) {
-      throw new Error(
-        "Oturum süresi dolmuş olabilir."
-      );
-    }
-
-    if (response.status === 403) {
-      throw new Error(
-        "Çalışma süresi eklemek için yetkiniz bulunmuyor."
-      );
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        await getErrorMessage(response)
-      );
-    }
-
-    return;
+  if (!response.ok) {
+    return fail(
+      response
+    );
   }
 
-  throw new Error(
-    "Time Log endpointi bulunamadı."
+  return response.json();
+}
+
+export async function updateChecklistItem(
+  taskId: string,
+  item: ChecklistItem,
+  patch: Partial<
+    Pick<
+      ChecklistItem,
+      | "title"
+      | "isCompleted"
+      | "sortOrder"
+    >
+  >
+): Promise<ChecklistItem> {
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/checklist/${item.id}`,
+      {
+        method: "PATCH",
+
+        headers:
+          headers(true),
+
+        body:
+          JSON.stringify({
+            title:
+              patch.title ??
+              item.title,
+
+            isCompleted:
+              patch.isCompleted ??
+              item.isCompleted,
+
+            sortOrder:
+              patch.sortOrder ??
+              item.sortOrder,
+          }),
+      }
+    );
+
+  if (!response.ok) {
+    return fail(
+      response
+    );
+  }
+
+  return response.json();
+}
+
+export async function deleteChecklistItem(
+  taskId: string,
+  itemId: string
+): Promise<void> {
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/checklist/${itemId}`,
+      {
+        method: "DELETE",
+
+        headers:
+          headers(),
+      }
+    );
+
+  if (!response.ok) {
+    return fail(
+      response
+    );
+  }
+}
+
+export async function getAttachments(
+  taskId: string
+): Promise<AttachmentItem[]> {
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/attachments`,
+      {
+        headers:
+          headers(),
+
+        cache:
+          "no-store",
+      }
+    );
+
+  if (!response.ok) {
+    return fail(
+      response
+    );
+  }
+
+  return response.json();
+}
+
+export async function uploadAttachment(
+  taskId: string,
+  file: File,
+  description: string
+): Promise<AttachmentItem> {
+  const token =
+    getStoredToken();
+
+  if (!token) {
+    throw new Error(
+      "Oturum bulunamadı."
+    );
+  }
+
+  const form =
+    new FormData();
+
+  if (!description.trim()) {
+    throw new Error(
+      "Dosya açıklaması zorunludur."
+    );
+  }
+
+  const isPdf =
+    file.type ===
+      "application/pdf" ||
+    file.name
+      .toLowerCase()
+      .endsWith(".pdf");
+
+  if (!isPdf) {
+    throw new Error(
+      "Yalnızca PDF formatında dosya yüklenebilir."
+    );
+  }
+
+  form.append(
+    "file",
+    file
+  );
+
+  form.append(
+    "description",
+    description.trim()
+  );
+
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/attachments`,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+        },
+
+        body:
+          form,
+      }
+    );
+
+  if (!response.ok) {
+    return fail(
+      response
+    );
+  }
+
+  return response.json();
+}
+
+export async function deleteAttachment(
+  taskId: string,
+  attachmentId: string
+): Promise<void> {
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/attachments/${attachmentId}`,
+      {
+        method: "DELETE",
+
+        headers:
+          headers(),
+      }
+    );
+
+  if (!response.ok) {
+    return fail(
+      response
+    );
+  }
+}
+
+export async function downloadAttachment(
+  taskId: string,
+  attachment: AttachmentItem
+): Promise<void> {
+  const response =
+    await fetch(
+      `${API_URL}/api/tasks/${taskId}/attachments/${attachment.id}/download`,
+      {
+        headers:
+          headers(),
+      }
+    );
+
+  if (!response.ok) {
+    return fail(
+      response
+    );
+  }
+
+  const blob =
+    await response.blob();
+
+  const url =
+    URL.createObjectURL(
+      blob
+    );
+
+  const link =
+    document.createElement(
+      "a"
+    );
+
+  link.href =
+    url;
+
+  link.download =
+    attachment.originalFileName;
+
+  document.body.appendChild(
+    link
+  );
+
+  link.click();
+
+  link.remove();
+
+  URL.revokeObjectURL(
+    url
   );
 }

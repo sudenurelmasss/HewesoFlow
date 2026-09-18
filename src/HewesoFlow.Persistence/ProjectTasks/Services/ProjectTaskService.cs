@@ -184,12 +184,17 @@ public class ProjectTaskService : IProjectTaskService
             filter.PageSize = 100;
         }
 
+        var isAdmin = await IsAdminAsync(currentUserId, cancellationToken);
+
         var ownedProjects =
-            await _unitOfWork.Projects.FindAsync(
-                project =>
-                    project.OwnerId == currentUserId &&
-                    !project.IsDeleted,
-                cancellationToken);
+            isAdmin
+                ? await _unitOfWork.Projects.FindAsync(
+                    project => !project.IsDeleted, cancellationToken)
+                : await _unitOfWork.Projects.FindAsync(
+                    project =>
+                        project.OwnerId == currentUserId &&
+                        !project.IsDeleted,
+                    cancellationToken);
 
         var memberProjects =
             await _unitOfWork.ProjectMembers.FindAsync(
@@ -1056,5 +1061,18 @@ public class ProjectTaskService : IProjectTaskService
             ? date.Value.ToString(
                 "dd.MM.yyyy HH:mm")
             : "Belirtilmemiş";
+    }
+
+    private async Task<bool> IsAdminAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var userRoles = await _unitOfWork.UserRoles.FindAsync(
+            item => item.UserId == userId && item.IsActive && !item.IsDeleted,
+            cancellationToken);
+        var roleIds = userRoles.Select(item => item.RoleId).ToHashSet();
+        if (roleIds.Count == 0) return false;
+        var roles = await _unitOfWork.Roles.FindAsync(
+            role => roleIds.Contains(role.Id) && role.IsActive && !role.IsDeleted,
+            cancellationToken);
+        return roles.Any(role => role.Name == "Admin");
     }
 }

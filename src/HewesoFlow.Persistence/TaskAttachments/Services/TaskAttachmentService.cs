@@ -15,17 +15,7 @@ public class TaskAttachmentService : ITaskAttachmentService
         AllowedExtensions =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".webp",
-            ".pdf",
-            ".txt",
-            ".doc",
-            ".docx",
-            ".xls",
-            ".xlsx",
-            ".zip"
+            ".pdf"
         };
 
     private readonly AppDbContext _context;
@@ -386,6 +376,15 @@ public class TaskAttachmentService : ITaskAttachmentService
                 "Dosya boyutu en fazla 10 MB olabilir.");
         }
 
+        if (!string.Equals(
+                request.ContentType,
+                "application/pdf",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "Yalnızca PDF formatında dosya yüklenebilir.");
+        }
+
         var fileName =
             Path.GetFileName(
                 request.FileName);
@@ -407,7 +406,7 @@ public class TaskAttachmentService : ITaskAttachmentService
                 extension))
         {
             throw new ArgumentException(
-                "Bu dosya türünün yüklenmesine izin verilmiyor.");
+                "Yalnızca PDF formatında dosya yüklenebilir.");
         }
     }
 

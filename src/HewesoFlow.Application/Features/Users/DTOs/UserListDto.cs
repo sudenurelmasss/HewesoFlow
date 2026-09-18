@@ -10,10 +10,12 @@ public class UserListDto
 
     public string Email { get; set; } = string.Empty;
 
+    public Guid? DepartmentId { get; set; }
+
     public string? Department { get; set; }
 
     public bool IsActive { get; set; }
 
-    public List<string> Roles { get; set; }
-        = new();
+    public List<string> Roles { get; set; } =
+        new();
 }

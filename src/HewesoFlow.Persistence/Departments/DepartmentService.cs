@@ -23,32 +23,51 @@ public class DepartmentService : IDepartmentService
             .AsNoTracking()
             .Where(department =>
                 !department.IsDeleted)
-            .OrderBy(department => department.Name)
-            .Select(department => new DepartmentListDto
-            {
-                Id = department.Id,
-                Name = department.Name,
-                Description = department.Description,
-                ManagerId = department.ManagerId,
+            .OrderBy(department =>
+                department.Name)
+            .Select(department =>
+                new DepartmentListDto
+                {
+                    Id = department.Id,
 
-                ManagerName =
-                    department.Manager == null
-                        ? null
-                        : department.Manager.FirstName +
-                          " " +
-                          department.Manager.LastName,
+                    Name = department.Name,
 
-                IsActive = department.IsActive,
+                    /*
+                     * Departman açıklaması artık
+                     * uygulama mantığında kullanılmıyor.
+                     */
+                    Description = null,
 
-                UserCount =
-                    department.Users.Count(user =>
-                        !user.IsDeleted),
+                    /*
+                     * Departmana tek ProjectManager
+                     * bağlama mantığı kaldırıldı.
+                     *
+                     * ProjectManager bilgileri artık
+                     * UserRoles üzerinden bulunuyor.
+                     */
+                    ManagerId = null,
+                    ManagerName = null,
 
-                ProjectCount =
-                    department.Projects.Count(project =>
-                        !project.IsDeleted)
-            })
-            .ToListAsync(cancellationToken);
+                    /*
+                     * Veritabanında alanı şimdilik
+                     * koruyoruz fakat tüm normal
+                     * departmanlar aktif kabul ediliyor.
+                     */
+                    IsActive = true,
+
+                    /*
+                     * Kullanıcı sayısı yalnızca gerçekten
+                     * aktif olan kullanıcıları sayar.
+                     */
+                    UserCount =
+                        department.Users.Count(user =>
+                            user.IsActive &&
+                            !user.IsDeleted),
+
+                    ProjectCount = 0
+                })
+            .ToListAsync(
+                cancellationToken);
     }
 
     public async Task<DepartmentListDto?> GetByIdAsync(
@@ -60,31 +79,29 @@ public class DepartmentService : IDepartmentService
             .Where(department =>
                 department.Id == id &&
                 !department.IsDeleted)
-            .Select(department => new DepartmentListDto
-            {
-                Id = department.Id,
-                Name = department.Name,
-                Description = department.Description,
-                ManagerId = department.ManagerId,
+            .Select(department =>
+                new DepartmentListDto
+                {
+                    Id = department.Id,
 
-                ManagerName =
-                    department.Manager == null
-                        ? null
-                        : department.Manager.FirstName +
-                          " " +
-                          department.Manager.LastName,
+                    Name = department.Name,
 
-                IsActive = department.IsActive,
+                    Description = null,
 
-                UserCount =
-                    department.Users.Count(user =>
-                        !user.IsDeleted),
+                    ManagerId = null,
+                    ManagerName = null,
 
-                ProjectCount =
-                    department.Projects.Count(project =>
-                        !project.IsDeleted)
-            })
-            .FirstOrDefaultAsync(cancellationToken);
+                    IsActive = true,
+
+                    UserCount =
+                        department.Users.Count(user =>
+                            user.IsActive &&
+                            !user.IsDeleted),
+
+                    ProjectCount = 0
+                })
+            .FirstOrDefaultAsync(
+                cancellationToken);
     }
 
     public async Task<DepartmentListDto> CreateAsync(
@@ -103,11 +120,15 @@ public class DepartmentService : IDepartmentService
 
         ValidateName(name);
 
+        var normalizedName =
+            name.ToLowerInvariant();
+
         var departmentExists =
             await _context.Departments
                 .AnyAsync(
                     department =>
-                        department.Name == name &&
+                        department.Name.ToLower() ==
+                            normalizedName &&
                         !department.IsDeleted,
                     cancellationToken);
 
@@ -121,17 +142,33 @@ public class DepartmentService : IDepartmentService
             new Department
             {
                 Id = Guid.NewGuid(),
+
                 Name = name,
 
-                Description =
-                    string.IsNullOrWhiteSpace(
-                        request.Description)
-                        ? null
-                        : request.Description.Trim(),
+                /*
+                 * Artık departman oluştururken
+                 * açıklama kullanılmıyor.
+                 */
+                Description = null,
 
+                /*
+                 * Departman oluşturulduğu anda
+                 * kullanılabilir durumda olur.
+                 */
                 IsActive = true,
+
+                /*
+                 * ManagerId özellikle boş bırakılıyor.
+                 *
+                 * Çünkü bir departmanda birden fazla
+                 * ProjectManager bulunabilir.
+                 */
+                ManagerId = null,
+
                 IsDeleted = false,
-                CreatedAt = DateTime.UtcNow
+
+                CreatedAt =
+                    DateTime.UtcNow
             };
 
         await _context.Departments.AddAsync(
@@ -144,16 +181,29 @@ public class DepartmentService : IDepartmentService
         return new DepartmentListDto
         {
             Id = department.Id,
+
             Name = department.Name,
-            Description = department.Description,
+
+            Description = null,
+
             ManagerId = null,
             ManagerName = null,
-            IsActive = department.IsActive,
+
+            IsActive = true,
+
             UserCount = 0,
+
             ProjectCount = 0
         };
     }
 
+    /*
+     * Eski endpoint sistemde bulunmaya devam ettiği
+     * için UpdateAsync metodunu kaldırmıyoruz.
+     *
+     * Fakat artık yalnızca departman adı değiştiriliyor.
+     * Açıklama ve aktif/pasif kullanılmıyor.
+     */
     public async Task<DepartmentListDto?> UpdateAsync(
         UpdateDepartmentRequestDto request,
         CancellationToken cancellationToken = default)
@@ -183,12 +233,16 @@ public class DepartmentService : IDepartmentService
 
         ValidateName(name);
 
+        var normalizedName =
+            name.ToLowerInvariant();
+
         var duplicateExists =
             await _context.Departments
                 .AnyAsync(
                     item =>
                         item.Id != request.Id &&
-                        item.Name == name &&
+                        item.Name.ToLower() ==
+                            normalizedName &&
                         !item.IsDeleted,
                     cancellationToken);
 
@@ -200,17 +254,35 @@ public class DepartmentService : IDepartmentService
 
         department.Name = name;
 
-        department.Description =
-            string.IsNullOrWhiteSpace(
-                request.Description)
-                ? null
-                : request.Description.Trim();
+        department.Description = null;
 
-        department.IsActive =
-            request.IsActive;
+        department.IsActive = true;
 
         department.UpdatedAt =
             DateTime.UtcNow;
+
+        /*
+         * Departman adı değişirse o departmandaki
+         * kullanıcıların eski string Department
+         * alanını da senkron tutuyoruz.
+         */
+        var users =
+            await _context.Users
+                .Where(user =>
+                    user.DepartmentId ==
+                        department.Id &&
+                    !user.IsDeleted)
+                .ToListAsync(
+                    cancellationToken);
+
+        foreach (var user in users)
+        {
+            user.Department =
+                department.Name;
+
+            user.UpdatedAt =
+                DateTime.UtcNow;
+        }
 
         await _context.SaveChangesAsync(
             cancellationToken);
@@ -237,8 +309,42 @@ public class DepartmentService : IDepartmentService
             return false;
         }
 
+        /*
+         * Kullanıcısı bulunan departmanın
+         * yanlışlıkla silinmesini engelliyoruz.
+         */
+        var hasUsers =
+            await _context.Users
+                .AnyAsync(
+                    user =>
+                        user.DepartmentId == id &&
+                        !user.IsDeleted,
+                    cancellationToken);
+
+        if (hasUsers)
+        {
+            throw new InvalidOperationException(
+                "İçerisinde kullanıcı bulunan departman silinemez.");
+        }
+
+        var hasProjects =
+            await _context.Projects
+                .AnyAsync(
+                    project =>
+                        project.DepartmentId == id &&
+                        !project.IsDeleted,
+                    cancellationToken);
+
+        if (hasProjects)
+        {
+            throw new InvalidOperationException(
+                "İçerisinde proje bulunan departman silinemez.");
+        }
+
         department.IsDeleted = true;
+
         department.IsActive = false;
+
         department.UpdatedAt =
             DateTime.UtcNow;
 
@@ -248,60 +354,28 @@ public class DepartmentService : IDepartmentService
         return true;
     }
 
-    public async Task<bool> AssignManagerAsync(
+    /*
+     * Bu metot eski API uyumluluğu için tutuluyor.
+     *
+     * Artık departmana "tek manager" atamıyoruz.
+     *
+     * ProjectManager ataması Admin ekranındaki
+     * UserRole mekanizmasıyla yapılmalı.
+     */
+    public Task<bool> AssignManagerAsync(
         Guid departmentId,
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var department =
-            await _context.Departments
-                .FirstOrDefaultAsync(
-                    item =>
-                        item.Id == departmentId &&
-                        !item.IsDeleted &&
-                        item.IsActive,
-                    cancellationToken);
-
-        if (department is null)
-        {
-            return false;
-        }
-
-        var user =
-            await _context.Users
-                .FirstOrDefaultAsync(
-                    item =>
-                        item.Id == userId &&
-                        !item.IsDeleted &&
-                        item.IsActive,
-                    cancellationToken);
-
-        if (user is null)
-        {
-            return false;
-        }
-
-        department.ManagerId =
-            user.Id;
-
-        department.UpdatedAt =
-            DateTime.UtcNow;
-
-        user.DepartmentId =
-            department.Id;
-
-        user.Department =
-            department.Name;
-
-        user.UpdatedAt =
-            DateTime.UtcNow;
-
-        await _context.SaveChangesAsync(
-            cancellationToken);
-
-        return true;
+        throw new InvalidOperationException(
+            "Departmana tek bir yönetici atanmaz. Kullanıcıya Admin ekranından ProjectManager rolü verin.");
     }
 
+    /*
+     * Kullanıcının departmanı gerekiyorsa Admin
+     * tarafından değiştirilebilmesi için bu eski
+     * metodu koruyoruz.
+     */
     public async Task<bool> AssignUserAsync(
         Guid departmentId,
         Guid userId,
@@ -311,9 +385,9 @@ public class DepartmentService : IDepartmentService
             await _context.Departments
                 .FirstOrDefaultAsync(
                     item =>
-                        item.Id == departmentId &&
-                        !item.IsDeleted &&
-                        item.IsActive,
+                        item.Id ==
+                            departmentId &&
+                        !item.IsDeleted,
                     cancellationToken);
 
         if (department is null)
@@ -325,9 +399,9 @@ public class DepartmentService : IDepartmentService
             await _context.Users
                 .FirstOrDefaultAsync(
                     item =>
-                        item.Id == userId &&
-                        !item.IsDeleted &&
-                        item.IsActive,
+                        item.Id ==
+                            userId &&
+                        !item.IsDeleted,
                     cancellationToken);
 
         if (user is null)
@@ -338,8 +412,6 @@ public class DepartmentService : IDepartmentService
         user.DepartmentId =
             department.Id;
 
-        // Eski Department string alanımızı
-        // geçiş sürecinde senkron tutuyoruz.
         user.Department =
             department.Name;
 
@@ -355,7 +427,8 @@ public class DepartmentService : IDepartmentService
     private static void ValidateName(
         string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(
+                name))
         {
             throw new ArgumentException(
                 "Departman adı boş bırakılamaz.");
